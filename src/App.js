@@ -1,9 +1,8 @@
-  import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
-  BookOpen, Sunrise, Sunset, Moon, Sun, LogOut, Shuffle, 
-  Plus, X, Book, Download, Upload, Target, CheckCircle,
-  Calendar, TrendingUp, Award, Eye, EyeOff, Menu, Home,
-  History, BarChart3
+  BookOpen, Sunrise, Sunset, Search, Calendar, Moon, Sun, 
+  Sparkles, ChevronRight, LogOut, Shuffle, Plus, X, 
+  AlertCircle, Eye, EyeOff, CheckCircle, Download, Upload
 } from 'lucide-react';
 import { auth, db } from './config/firebase-config';
 import { 
@@ -21,6 +20,7 @@ import {
   where,
   getDocs,
   updateDoc,
+  deleteDoc,
   Timestamp 
 } from 'firebase/firestore';
 import './App.css';
@@ -36,169 +36,119 @@ function App() {
   const [showPassword, setShowPassword] = useState(false);
 
   // Estados de Navegação
-  const [view, setView] = useState('home');
+  const [view, setView] = useState('today');
   const [theme, setTheme] = useState('light');
-  const [showMobileMenu, setShowMobileMenu] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
 
   // Estados do Prólogo
   const [morningDone, setMorningDone] = useState(false);
   const [selectedVirtue, setSelectedVirtue] = useState('');
-  const [showVirtueDetail, setShowVirtueDetail] = useState(null);
+  const [customVirtue, setCustomVirtue] = useState('');
+  const [showCustomVirtue, setShowCustomVirtue] = useState(false);
+  const [dailyQuote, setDailyQuote] = useState(null);
   const [dailyIntention, setDailyIntention] = useState('');
   const [lastDrawDate, setLastDrawDate] = useState(null);
-  const [dailyQuote, setDailyQuote] = useState(null);
 
   // Estados do Epílogo
   const [eveningDone, setEveningDone] = useState(false);
-  const [didMorning, setDidMorning] = useState(true);
   const [whereIFailed, setWhereIFailed] = useState('');
   const [whatIDidWell, setWhatIDidWell] = useState('');
   const [whatILeftUndone, setWhatILeftUndone] = useState('');
 
-  // Estados de Tarefas Personalizadas
-  const [customTasks, setCustomTasks] = useState([]);
-  const [newTaskName, setNewTaskName] = useState('');
-  const [showAddTask, setShowAddTask] = useState(false);
-  const [todayTasksStatus, setTodayTasksStatus] = useState({});
-
-  // Estados de Metas de Longo Prazo
-  const [yearGoals, setYearGoals] = useState('');
-  const [lifeGoals, setLifeGoals] = useState('');
-
   // Estados de Histórico
   const [entries, setEntries] = useState([]);
 
-  // Estados FV (oculto)
-  const [fvUnlocked, setFvUnlocked] = useState(false);
-  const [fvClickCount, setFvClickCount] = useState(0);
-
-  // Virtudes com descrições
+  // Virtudes
   const virtues = [
     {
       name: "Paciência",
-      shortDesc: "Suportar dificuldades mantendo a serenidade",
       description: "A capacidade de suportar dificuldades sem se perturbar, mantendo a serenidade diante das adversidades e do tempo necessário para as coisas se realizarem.",
-      practices: "• Respirar profundamente antes de reagir\n• Observar a irritação sem agir impulsivamente\n• Lembrar que tudo tem seu tempo",
-      color: "#4A90E2"
+      practices: "Respirar profundamente antes de reagir; Observar a irritação sem agir impulsivamente; Lembrar que tudo tem seu tempo."
     },
     {
       name: "Ordem",
-      shortDesc: "Harmonia no mundo exterior e interior",
       description: "Disposição harmoniosa das coisas em seu devido lugar, tanto no mundo exterior quanto no interior.",
-      practices: "• Organizar espaço físico diariamente\n• Criar rotinas conscientes\n• Planejar o dia com antecedência",
-      color: "#7B68EE"
+      practices: "Organizar espaço físico; Criar rotinas conscientes; Planejar o dia com antecedência."
     },
     {
       name: "Generosidade",
-      shortDesc: "Dar livremente sem esperar retorno",
-      description: "Compartilhar tempo, atenção, recursos e conhecimento com quem necessita, sem expectativa de recompensa.",
-      practices: "• Oferecer ajuda sem ser pedido\n• Compartilhar conhecimento\n• Doar tempo e atenção genuína",
-      color: "#50C878"
+      description: "Dar livremente sem esperar retorno, compartilhar tempo, atenção, recursos e conhecimento com quem necessita.",
+      practices: "Oferecer ajuda sem ser pedido; Compartilhar conhecimento; Doar tempo e atenção genuína."
     },
     {
       name: "Coragem",
-      shortDesc: "Agir corretamente mesmo sob pressão",
       description: "Força interior para enfrentar o medo, agir corretamente mesmo sob pressão e defender princípios mesmo quando difícil.",
-      practices: "• Fazer o certo mesmo com medo\n• Falar a verdade com tato\n• Enfrentar desafios ao invés de evitá-los",
-      color: "#E74C3C"
+      practices: "Fazer o certo mesmo com medo; Falar a verdade com tato; Enfrentar desafios ao invés de evitá-los."
     },
     {
       name: "Temperança",
-      shortDesc: "Moderação e equilíbrio",
       description: "Moderação em todas as coisas, equilíbrio entre extremos, domínio sobre impulsos e desejos desmedidos.",
-      practices: "• Evitar excessos em todas as áreas\n• Buscar o meio-termo\n• Dominar impulsos automáticos",
-      color: "#9B59B6"
+      practices: "Evitar excessos; Buscar o meio-termo; Dominar impulsos automáticos."
     },
     {
       name: "Honestidade",
-      shortDesc: "Viver em consonância com a verdade",
-      description: "Ser íntegro em palavras e ações, não enganar a si mesmo nem aos outros.",
-      practices: "• Falar a verdade com compaixão\n• Reconhecer erros abertamente\n• Ser transparente nas intenções",
-      color: "#3498DB"
+      description: "Viver em consonância com a verdade, ser íntegro em palavras e ações.",
+      practices: "Falar a verdade com compaixão; Reconhecer erros; Ser transparente nas intenções."
     },
     {
       name: "Humildade",
-      shortDesc: "Reconhecer limitações e estar aberto",
-      description: "Reconhecer limitações sem falsa modéstia, estar aberto a aprender, não se colocar acima dos outros.",
-      practices: "• Ouvir mais que falar\n• Reconhecer que sempre há mais a aprender\n• Aceitar críticas construtivas",
-      color: "#95A5A6"
+      description: "Reconhecer limitações sem falsa modéstia, estar aberto a aprender.",
+      practices: "Ouvir mais que falar; Reconhecer que sempre há mais a aprender; Aceitar críticas construtivas."
     },
     {
       name: "Disciplina",
-      shortDesc: "Manter compromissos consigo mesmo",
-      description: "Capacidade de seguir princípios escolhidos mesmo sem supervisão externa.",
-      practices: "• Cumprir pequenos compromissos diários\n• Manter práticas mesmo sem vontade\n• Criar e seguir uma rotina",
-      color: "#34495E"
+      description: "Capacidade de manter compromissos consigo mesmo.",
+      practices: "Cumprir pequenos compromissos diários; Manter práticas mesmo sem vontade; Criar e seguir uma rotina."
     },
     {
       name: "Compaixão",
-      shortDesc: "Sentir com o outro",
-      description: "Compreender o sofrimento alheio e agir para aliviá-lo quando possível.",
-      practices: "• Ver além das aparências\n• Oferecer presença empática\n• Perdoar falhas humanas",
-      color: "#E67E22"
+      description: "Sentir com o outro, compreender o sofrimento alheio.",
+      practices: "Ver além das aparências; Oferecer presença empática; Perdoar falhas humanas."
     },
     {
       name: "Prudência",
-      shortDesc: "Sabedoria prática",
-      description: "Avaliar situações, prever consequências e tomar decisões ponderadas.",
-      practices: "• Pensar antes de agir\n• Considerar consequências\n• Buscar conselho quando necessário",
-      color: "#16A085"
+      description: "Sabedoria prática para avaliar situações e tomar decisões ponderadas.",
+      practices: "Pensar antes de agir; Considerar consequências; Buscar conselho quando necessário."
     },
     {
       name: "Justiça",
-      shortDesc: "Dar a cada um o que lhe é devido",
-      description: "Agir com equidade, respeitar direitos e cumprir deveres.",
-      practices: "• Tratar todos com equidade\n• Cumprir compromissos assumidos\n• Reconhecer méritos alheios",
-      color: "#C0392B"
+      description: "Dar a cada um o que lhe é devido, agir com equidade.",
+      practices: "Tratar todos com equidade; Cumprir compromissos; Reconhecer méritos alheios."
     },
     {
       name: "Gratidão",
-      shortDesc: "Reconhecer e valorizar",
-      description: "Cultivar apreciação pelas bênçãos da vida.",
-      practices: "• Agradecer diariamente por três coisas\n• Valorizar pequenas coisas\n• Expressar reconhecimento aos outros",
-      color: "#F39C12"
+      description: "Reconhecer e valorizar o que se recebe.",
+      practices: "Agradecer diariamente; Valorizar pequenas coisas; Expressar reconhecimento."
     },
     {
       name: "Serenidade",
-      shortDesc: "Paz interior",
-      description: "Tranquilidade da mente e do coração independente das circunstâncias.",
-      practices: "• Meditar regularmente\n• Não reagir automaticamente\n• Cultivar paz interior através da contemplação",
-      color: "#1ABC9C"
+      description: "Paz interior que não se abala com as circunstâncias externas.",
+      practices: "Meditar regularmente; Não reagir automaticamente; Cultivar paz interior."
     },
     {
       name: "Diligência",
-      shortDesc: "Aplicação cuidadosa",
-      description: "Fazer bem o que precisa ser feito, com atenção e dedicação.",
-      practices: "• Fazer cada tarefa com atenção plena\n• Não deixar para depois\n• Completar o que começou",
-      color: "#2ECC71"
+      description: "Aplicação cuidadosa e persistente no cumprimento de tarefas.",
+      practices: "Fazer cada tarefa com atenção plena; Não deixar para depois; Completar o que começou."
     },
     {
       name: "Bondade",
-      shortDesc: "Inclinação natural para o bem",
-      description: "Agir com gentileza e benevolência em todas as circunstâncias.",
-      practices: "• Fazer pequenos gestos gentis diariamente\n• Falar palavras encorajadoras\n• Agir com benevolência mesmo quando difícil",
-      color: "#FF69B4"
+      description: "Inclinação natural para o bem, agir com gentileza.",
+      practices: "Fazer pequenos gestos gentis; Falar palavras encorajadoras; Agir com benevolência."
     },
     {
       name: "Sabedoria",
-      shortDesc: "Conhecimento com discernimento",
-      description: "Compreensão profunda da vida e capacidade de ver a essência das coisas.",
-      practices: "• Estudar filosofia regularmente\n• Refletir sobre experiências\n• Buscar compreensão profunda, não superficial",
-      color: "#8E44AD"
+      description: "Conhecimento aplicado com discernimento.",
+      practices: "Estudar filosofia; Refletir sobre experiências; Buscar compreensão profunda."
     },
     {
       name: "Fortaleza",
-      shortDesc: "Resistência interior",
-      description: "Perseverar em objetivos nobres mesmo diante de dificuldades prolongadas.",
-      practices: "• Perseverar em objetivos importantes\n• Manter-se firme em princípios\n• Não desistir facilmente",
-      color: "#D35400"
+      description: "Resistência interior para perseverar em objetivos nobres.",
+      practices: "Perseverar em objetivos; Manter-se firme em princípios; Não desistir facilmente."
     },
     {
       name: "Fraternidade",
-      shortDesc: "Reconhecer a unidade",
-      description: "Tratar os outros como irmãos na jornada humana.",
-      practices: "• Ver a humanidade comum em todos\n• Ajudar sem distinção\n• Cultivar sentimento de união",
-      color: "#27AE60"
+      description: "Reconhecer a unidade essencial de todos os seres.",
+      practices: "Ver a humanidade comum; Ajudar sem distinção; Cultivar sentimento de união."
     }
   ];
 
@@ -225,16 +175,6 @@ function App() {
     return lastDrawDate !== today;
   };
 
-  const handleLogoClick = () => {
-    setFvClickCount(prev => prev + 1);
-    if (fvClickCount >= 6) {
-      setFvUnlocked(true);
-      setFvClickCount(0);
-      alert('🔓 Modo FV desbloqueado!');
-    }
-    setTimeout(() => setFvClickCount(0), 3000);
-  };
-
   // Sortear virtude (só uma vez por dia)
   const selectRandomVirtue = async () => {
     if (!canDrawToday()) {
@@ -245,6 +185,7 @@ function App() {
     const randomIndex = Math.floor(Math.random() * virtues.length);
     const selectedV = virtues[randomIndex].name;
     setSelectedVirtue(selectedV);
+    setShowCustomVirtue(false);
 
     const today = getTodayKey();
     setLastDrawDate(today);
@@ -268,8 +209,6 @@ function App() {
         await loadUserData(currentUser.uid);
         await loadTodayEntry(currentUser.uid);
         await loadAllEntries(currentUser.uid);
-        await loadCustomTasks(currentUser.uid);
-        await loadLongTermGoals(currentUser.uid);
       } else {
         setUser(null);
       }
@@ -287,13 +226,11 @@ function App() {
         const data = userDoc.data();
         setTheme(data.theme || 'light');
         setLastDrawDate(data.lastDrawDate || null);
-        setFvUnlocked(data.fvUnlocked || false);
       } else {
         await setDoc(doc(db, 'users', uid), {
           createdAt: Timestamp.now(),
           theme: 'light',
-          lastDrawDate: null,
-          fvUnlocked: false
+          lastDrawDate: null
         });
       }
     } catch (error) {
@@ -310,22 +247,21 @@ function App() {
         const data = entryDoc.data();
         setMorningDone(data.morningDone || false);
         setSelectedVirtue(data.virtue || '');
+        setCustomVirtue(data.customVirtue || '');
+        setDailyQuote(data.quote || null);
         setDailyIntention(data.intention || '');
         setEveningDone(data.eveningDone || false);
         setWhereIFailed(data.whereIFailed || '');
         setWhatIDidWell(data.whatIDidWell || '');
         setWhatILeftUndone(data.whatILeftUndone || '');
-        setDidMorning(data.didMorning !== false);
-        setDailyQuote(data.quote || null);
-        setTodayTasksStatus(data.tasksStatus || {});
-      }
-
-      if (!dailyQuote) {
+      } else {
         const randomQuote = philosophicalQuotes[Math.floor(Math.random() * philosophicalQuotes.length)];
         setDailyQuote(randomQuote);
       }
     } catch (error) {
       console.error('Erro ao carregar entrada:', error);
+      const randomQuote = philosophicalQuotes[Math.floor(Math.random() * philosophicalQuotes.length)];
+      setDailyQuote(randomQuote);
     }
   };
 
@@ -351,68 +287,12 @@ function App() {
     }
   };
 
-  // Carregar tarefas personalizadas
-  const loadCustomTasks = async (uid) => {
-    try {
-      const tasksDoc = await getDoc(doc(db, 'customTasks', uid));
-      if (tasksDoc.exists()) {
-        setCustomTasks(tasksDoc.data().tasks || []);
-      }
-    } catch (error) {
-      console.error('Erro ao carregar tarefas:', error);
-    }
-  };
-
-  // Carregar metas de longo prazo
-  const loadLongTermGoals = async (uid) => {
-    try {
-      const goalsDoc = await getDoc(doc(db, 'longTermGoals', uid));
-      if (goalsDoc.exists()) {
-        const data = goalsDoc.data();
-        setYearGoals(data.yearGoals || '');
-        setLifeGoals(data.lifeGoals || '');
-      }
-    } catch (error) {
-      console.error('Erro ao carregar metas:', error);
-    }
-  };
-
-  // Adicionar tarefa personalizada
-  const addCustomTask = async () => {
-    if (!newTaskName.trim()) return;
-
-    const newTasks = [...customTasks, { id: Date.now(), name: newTaskName }];
-    setCustomTasks(newTasks);
-    setNewTaskName('');
-    setShowAddTask(false);
-
-    if (user) {
-      await setDoc(doc(db, 'customTasks', user.uid), { tasks: newTasks });
-    }
-  };
-
-  // Remover tarefa personalizada
-  const removeCustomTask = async (taskId) => {
-    const newTasks = customTasks.filter(t => t.id !== taskId);
-    setCustomTasks(newTasks);
-
-    if (user) {
-      await setDoc(doc(db, 'customTasks', user.uid), { tasks: newTasks });
-    }
-  };
-
-  // Marcar/desmarcar tarefa do dia
-  const toggleTaskStatus = (taskId) => {
-    setTodayTasksStatus(prev => ({
-      ...prev,
-      [taskId]: !prev[taskId]
-    }));
-  };
-
   // Salvar Prólogo
   const saveMorning = async () => {
-    if (!selectedVirtue.trim()) {
-      alert('Por favor, selecione ou sorteie uma virtude para o dia.');
+    const finalVirtue = showCustomVirtue ? customVirtue : selectedVirtue;
+
+    if (!finalVirtue.trim()) {
+      alert('Por favor, selecione ou digite uma virtude para o dia.');
       return;
     }
 
@@ -421,10 +301,10 @@ function App() {
       userId: user.uid,
       date: todayKey,
       morningDone: true,
-      virtue: selectedVirtue,
+      virtue: finalVirtue,
+      customVirtue: showCustomVirtue ? customVirtue : '',
       quote: dailyQuote,
       intention: dailyIntention,
-      tasksStatus: todayTasksStatus,
       morningTimestamp: Timestamp.now()
     };
 
@@ -432,7 +312,6 @@ function App() {
       await setDoc(doc(db, 'entries', `${user.uid}_${todayKey}`), entry, { merge: true });
       setMorningDone(true);
       alert('✅ Prólogo salvo com sucesso!');
-      setView('home');
     } catch (error) {
       alert('Erro ao salvar prólogo. Tente novamente.');
     }
@@ -459,7 +338,6 @@ function App() {
         whereIFailed,
         whatIDidWell,
         whatILeftUndone,
-        didMorning,
         eveningTimestamp: Timestamp.now()
       };
 
@@ -467,39 +345,33 @@ function App() {
       setEveningDone(true);
       await loadAllEntries(user.uid);
       alert('✅ Epílogo salvo com sucesso!');
-      setView('home');
     } catch (error) {
       alert('Erro ao salvar epílogo. Tente novamente.');
     }
   };
 
-  // Salvar metas de longo prazo
-  const saveLongTermGoals = async () => {
-    if (user) {
-      try {
-        await setDoc(doc(db, 'longTermGoals', user.uid), {
-          yearGoals,
-          lifeGoals,
-          updatedAt: Timestamp.now()
-        });
-        alert('✅ Metas salvas com sucesso!');
-      } catch (error) {
-        alert('Erro ao salvar metas.');
-      }
+  // Deletar entrada
+  const deleteEntry = async (dateKey) => {
+    if (!window.confirm('Deseja realmente excluir este dia?')) return;
+
+    try {
+      await deleteDoc(doc(db, 'entries', `${user.uid}_${dateKey}`));
+      setEntries(entries.filter(e => e.date !== dateKey));
+    } catch (error) {
+      alert('Erro ao excluir entrada.');
     }
   };
 
-  // Exportar para CSV
+  // Exportar CSV
   const exportToCSV = () => {
     if (entries.length === 0) {
       alert('Não há entradas para exportar');
       return;
     }
 
-    const headers = ['Data', 'Fez Prólogo', 'Virtude', 'Compromisso', 'Onde Errei', 'O Que Fiz Bem', 'O Que Deixei de Fazer'];
+    const headers = ['Data', 'Virtude', 'Compromisso', 'Onde Errei', 'O Que Fiz Bem', 'O Que Deixei de Fazer'];
     const rows = entries.map(entry => [
       entry.date,
-      entry.didMorning ? 'Sim' : 'Não',
       entry.virtue || '',
       entry.intention || '',
       entry.whereIFailed || '',
@@ -551,7 +423,7 @@ function App() {
 
   const handleLogout = async () => {
     await signOut(auth);
-    setView('home');
+    setView('today');
   };
 
   const toggleTheme = async () => {
@@ -562,8 +434,16 @@ function App() {
     }
   };
 
+  const filteredEntries = entries.filter(entry =>
+    (entry.whereIFailed && entry.whereIFailed.toLowerCase().includes(searchTerm.toLowerCase())) ||
+    (entry.whatIDidWell && entry.whatIDidWell.toLowerCase().includes(searchTerm.toLowerCase())) ||
+    (entry.whatILeftUndone && entry.whatILeftUndone.toLowerCase().includes(searchTerm.toLowerCase())) ||
+    (entry.virtue && entry.virtue.toLowerCase().includes(searchTerm.toLowerCase()))
+  );
+
   const isDark = theme === 'dark';
 
+  // O código continua... (devido ao limite de caracteres, vou dividir em partes)
   // Tela de Loading
   if (loading) {
     return (
@@ -572,12 +452,14 @@ function App() {
         display: 'flex', 
         alignItems: 'center', 
         justifyContent: 'center',
-        background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 100%)',
-        color: '#f0e6d2',
+        background: isDark 
+          ? 'linear-gradient(135deg, #1a1a2e 0%, #16213e 100%)'
+          : 'linear-gradient(135deg, #f0e6d2 0%, #e8dcc4 100%)',
+        color: isDark ? '#f0e6d2' : '#2c1810',
         fontFamily: 'Georgia, serif'
       }}>
         <div style={{ textAlign: 'center' }}>
-          <BookOpen size={48} className="pulse" />
+          <BookOpen size={48} />
           <p style={{ marginTop: '1rem', fontSize: '1.1rem' }}>Carregando...</p>
         </div>
       </div>
@@ -679,8 +561,12 @@ function App() {
                 borderRadius: '8px',
                 fontSize: '0.9rem',
                 marginBottom: '1rem',
-                border: '1px solid #fcc'
+                border: '1px solid #fcc',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem'
               }}>
+                <AlertCircle size={16} />
                 {error}
               </div>
             )}
@@ -734,4 +620,789 @@ function App() {
     );
   }
 
- } // App Principal (continua no próximo comentário...)
+  // App Principal
+  return (
+    <div style={{
+      minHeight: '100vh',
+      background: isDark 
+        ? 'linear-gradient(135deg, #1a1a2e 0%, #16213e 100%)'
+        : 'linear-gradient(135deg, #f0e6d2 0%, #e8dcc4 100%)',
+      fontFamily: 'Georgia, serif',
+      transition: 'background 0.3s ease'
+    }}>
+      {/* Header */}
+      <header style={{
+        padding: '1rem 2rem',
+        borderBottom: `2px solid ${isDark ? '#d4af37' : '#8b7355'}`,
+        background: isDark ? 'rgba(26, 26, 46, 0.95)' : 'rgba(240, 230, 210, 0.95)',
+        backdropFilter: 'blur(10px)',
+        position: 'sticky',
+        top: 0,
+        zIndex: 100
+      }}>
+        <div style={{
+          maxWidth: '1200px',
+          margin: '0 auto',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          flexWrap: 'wrap',
+          gap: '1rem'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            <BookOpen size={32} color={isDark ? '#d4af37' : '#8b7355'} />
+            <h1 style={{
+              margin: 0,
+              fontFamily: 'Georgia, serif',
+              fontSize: '1.5rem',
+              color: isDark ? '#f0e6d2' : '#2c1810',
+              fontWeight: 700
+            }}>
+              Diário Filosófico
+            </h1>
+          </div>
+
+          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+            <button
+              onClick={() => setView('today')}
+              style={{
+                padding: '0.5rem 1rem',
+                background: view === 'today' ? (isDark ? '#d4af37' : '#8b7355') : 'transparent',
+                color: view === 'today' ? (isDark ? '#1a1a2e' : '#f0e6d2') : (isDark ? '#d4af37' : '#8b7355'),
+                border: `2px solid ${isDark ? '#d4af37' : '#8b7355'}`,
+                borderRadius: '8px',
+                cursor: 'pointer',
+                fontFamily: 'Georgia, serif',
+                fontSize: '0.9rem',
+                fontWeight: 600
+              }}
+            >
+              Hoje
+            </button>
+
+            <button
+              onClick={() => setView('history')}
+              style={{
+                padding: '0.5rem 1rem',
+                background: view === 'history' ? (isDark ? '#d4af37' : '#8b7355') : 'transparent',
+                color: view === 'history' ? (isDark ? '#1a1a2e' : '#f0e6d2') : (isDark ? '#d4af37' : '#8b7355'),
+                border: `2px solid ${isDark ? '#d4af37' : '#8b7355'}`,
+                borderRadius: '8px',
+                cursor: 'pointer',
+                fontFamily: 'Georgia, serif',
+                fontSize: '0.9rem',
+                fontWeight: 600
+              }}
+            >
+              Histórico
+            </button>
+
+            <button
+              onClick={toggleTheme}
+              style={{
+                padding: '0.5rem',
+                background: 'transparent',
+                border: `2px solid ${isDark ? '#d4af37' : '#8b7355'}`,
+                borderRadius: '50%',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}
+            >
+              {isDark ? <Sun size={20} color="#d4af37" /> : <Moon size={20} color="#8b7355" />}
+            </button>
+
+            <button
+              onClick={handleLogout}
+              style={{
+                padding: '0.5rem 1rem',
+                background: 'transparent',
+                color: isDark ? '#d4af37' : '#8b7355',
+                border: `2px solid ${isDark ? '#d4af37' : '#8b7355'}`,
+                borderRadius: '8px',
+                cursor: 'pointer',
+                fontFamily: 'Georgia, serif',
+                fontSize: '0.9rem',
+                fontWeight: 600,
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem'
+              }}
+            >
+              <LogOut size={16} />
+              Sair
+            </button>
+          </div>
+        </div>
+      </header>
+
+      {/* Main Content */}
+      <main style={{
+        maxWidth: '1200px',
+        margin: '0 auto',
+        padding: '2rem 1rem'
+      }}>
+        {/* VIEW: TODAY */}
+        {view === 'today' && (
+          <div>
+            {/* Citação do Dia */}
+            {dailyQuote && (
+              <div style={{
+                padding: '2rem',
+                background: isDark 
+                  ? 'rgba(212, 175, 55, 0.1)' 
+                  : 'rgba(255, 245, 220, 0.6)',
+                borderRadius: '16px',
+                border: `2px solid ${isDark ? 'rgba(212, 175, 55, 0.3)' : 'rgba(139, 115, 85, 0.3)'}`,
+                marginBottom: '2rem'
+              }}>
+                <p style={{
+                  fontSize: '1.2rem',
+                  fontStyle: 'italic',
+                  color: isDark ? '#f0e6d2' : '#2c1810',
+                  marginBottom: '1rem',
+                  lineHeight: '1.8'
+                }}>
+                  "{dailyQuote.text}"
+                </p>
+                <p style={{
+                  fontSize: '1rem',
+                  color: isDark ? '#b8a88a' : '#6b5744',
+                  textAlign: 'right',
+                  margin: 0
+                }}>
+                  — {dailyQuote.author}
+                </p>
+              </div>
+            )}
+
+            {/* PRÓLOGO */}
+            <div style={{
+              background: isDark ? 'rgba(26, 26, 46, 0.6)' : 'white',
+              padding: '2rem',
+              borderRadius: '16px',
+              marginBottom: '2rem',
+              border: `2px solid ${isDark ? 'rgba(212, 175, 55, 0.3)' : 'rgba(139, 115, 85, 0.2)'}`,
+              boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1.5rem' }}>
+                <Sunrise size={28} color={isDark ? '#ffd966' : '#ff9800'} />
+                <h2 style={{
+                  margin: 0,
+                  fontSize: '1.8rem',
+                  color: isDark ? '#f0e6d2' : '#2c1810'
+                }}>
+                  Prólogo Matinal
+                </h2>
+              </div>
+
+              {morningDone ? (
+                <div style={{
+                  padding: '1.5rem',
+                  background: isDark ? 'rgba(76, 175, 80, 0.2)' : '#e8f5e9',
+                  borderRadius: '12px',
+                  border: `2px solid ${isDark ? 'rgba(76, 175, 80, 0.4)' : '#4caf50'}`
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem' }}>
+                    <CheckCircle size={24} color="#4caf50" />
+                    <h3 style={{ margin: 0, color: isDark ? '#81c784' : '#2e7d32' }}>
+                      Prólogo Completo!
+                    </h3>
+                  </div>
+                  <p style={{ margin: '0.5rem 0', color: isDark ? '#c8e6c9' : '#1b5e20' }}>
+                    <strong>Virtude do dia:</strong> {selectedVirtue || customVirtue}
+                  </p>
+                  {dailyIntention && (
+                    <p style={{ margin: '0.5rem 0', color: isDark ? '#c8e6c9' : '#1b5e20' }}>
+                      <strong>Compromisso:</strong> {dailyIntention}
+                    </p>
+                  )}
+                </div>
+              ) : (
+                <div>
+                  {/* Seleção de Virtude */}
+                  <div style={{ marginBottom: '1.5rem' }}>
+                    <label style={{
+                      display: 'block',
+                      marginBottom: '0.5rem',
+                      fontWeight: 600,
+                      color: isDark ? '#f0e6d2' : '#2c1810'
+                    }}>
+                      Virtude do Dia:
+                    </label>
+
+                    <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
+                      <button
+                        onClick={selectRandomVirtue}
+                        disabled={!canDrawToday()}
+                        style={{
+                          padding: '0.75rem 1.5rem',
+                          background: canDrawToday() 
+                            ? (isDark ? '#d4af37' : '#8b7355')
+                            : (isDark ? 'rgba(212, 175, 55, 0.3)' : 'rgba(139, 115, 85, 0.3)'),
+                          color: canDrawToday() ? 'white' : (isDark ? '#888' : '#999'),
+                          border: 'none',
+                          borderRadius: '8px',
+                          cursor: canDrawToday() ? 'pointer' : 'not-allowed',
+                          fontFamily: 'Georgia, serif',
+                          fontWeight: 600,
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.5rem'
+                        }}
+                      >
+                        <Shuffle size={18} />
+                        {canDrawToday() ? 'Sortear Virtude' : 'Já sorteou hoje'}
+                      </button>
+
+                      <button
+                        onClick={() => setShowCustomVirtue(!showCustomVirtue)}
+                        style={{
+                          padding: '0.75rem 1.5rem',
+                          background: 'transparent',
+                          color: isDark ? '#d4af37' : '#8b7355',
+                          border: `2px solid ${isDark ? '#d4af37' : '#8b7355'}`,
+                          borderRadius: '8px',
+                          cursor: 'pointer',
+                          fontFamily: 'Georgia, serif',
+                          fontWeight: 600
+                        }}
+                      >
+                        {showCustomVirtue ? 'Escolher da Lista' : 'Escrever Própria Virtude'}
+                      </button>
+                    </div>
+
+                    {showCustomVirtue ? (
+                      <input
+                        type="text"
+                        placeholder="Digite sua virtude..."
+                        value={customVirtue}
+                        onChange={(e) => setCustomVirtue(e.target.value)}
+                        style={{
+                          width: '100%',
+                          padding: '0.75rem',
+                          border: `2px solid ${isDark ? 'rgba(212, 175, 55, 0.5)' : '#8b7355'}`,
+                          borderRadius: '8px',
+                          fontSize: '1rem',
+                          fontFamily: 'Georgia, serif',
+                          background: isDark ? 'rgba(26, 26, 46, 0.8)' : 'white',
+                          color: isDark ? '#f0e6d2' : '#2c1810'
+                        }}
+                      />
+                    ) : (
+                      <select
+                        value={selectedVirtue}
+                        onChange={(e) => setSelectedVirtue(e.target.value)}
+                        style={{
+                          width: '100%',
+                          padding: '0.75rem',
+                          border: `2px solid ${isDark ? 'rgba(212, 175, 55, 0.5)' : '#8b7355'}`,
+                          borderRadius: '8px',
+                          fontSize: '1rem',
+                          fontFamily: 'Georgia, serif',
+                          background: isDark ? 'rgba(26, 26, 46, 0.8)' : 'white',
+                          color: isDark ? '#f0e6d2' : '#2c1810'
+                        }}
+                      >
+                        <option value="">Selecione uma virtude...</option>
+                        {virtues.map((v, idx) => (
+                          <option key={idx} value={v.name}>{v.name}</option>
+                        ))}
+                      </select>
+                    )}
+
+                    {/* Descrição da Virtude Selecionada */}
+                    {selectedVirtue && !showCustomVirtue && (
+                      <div style={{
+                        marginTop: '1rem',
+                        padding: '1rem',
+                        background: isDark ? 'rgba(212, 175, 55, 0.1)' : 'rgba(255, 245, 220, 0.5)',
+                        borderRadius: '8px',
+                        border: `1px solid ${isDark ? 'rgba(212, 175, 55, 0.3)' : 'rgba(139, 115, 85, 0.3)'}`
+                      }}>
+                        <h4 style={{ 
+                          margin: '0 0 0.5rem 0', 
+                          color: isDark ? '#d4af37' : '#8b7355' 
+                        }}>
+                          {selectedVirtue}
+                        </h4>
+                        <p style={{ 
+                          margin: '0.5rem 0', 
+                          fontSize: '0.95rem',
+                          color: isDark ? '#c8b896' : '#6b5744'
+                        }}>
+                          {virtues.find(v => v.name === selectedVirtue)?.description}
+                        </p>
+                        <p style={{ 
+                          margin: '0.5rem 0 0 0', 
+                          fontSize: '0.9rem',
+                          color: isDark ? '#b8a88a' : '#8b7355',
+                          fontStyle: 'italic'
+                        }}>
+                          <strong>Práticas:</strong> {virtues.find(v => v.name === selectedVirtue)?.practices}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Compromisso do Dia */}
+                  <div style={{ marginBottom: '1.5rem' }}>
+                    <label style={{
+                      display: 'block',
+                      marginBottom: '0.5rem',
+                      fontWeight: 600,
+                      color: isDark ? '#f0e6d2' : '#2c1810'
+                    }}>
+                      Meu compromisso para hoje:
+                    </label>
+                    <textarea
+                      value={dailyIntention}
+                      onChange={(e) => setDailyIntention(e.target.value)}
+                      placeholder="Como vou praticar esta virtude hoje?"
+                      rows={4}
+                      style={{
+                        width: '100%',
+                        padding: '0.75rem',
+                        border: `2px solid ${isDark ? 'rgba(212, 175, 55, 0.5)' : '#8b7355'}`,
+                        borderRadius: '8px',
+                        fontSize: '1rem',
+                        fontFamily: 'Georgia, serif',
+                        background: isDark ? 'rgba(26, 26, 46, 0.8)' : 'white',
+                        color: isDark ? '#f0e6d2' : '#2c1810',
+                        resize: 'vertical'
+                      }}
+                    />
+                  </div>
+
+                  <button
+                    onClick={saveMorning}
+                    style={{
+                      width: '100%',
+                      padding: '1rem',
+                      background: isDark ? '#d4af37' : '#8b7355',
+                      color: isDark ? '#1a1a2e' : 'white',
+                      border: 'none',
+                      borderRadius: '8px',
+                      fontSize: '1.1rem',
+                      fontWeight: 'bold',
+                      cursor: 'pointer',
+                      fontFamily: 'Georgia, serif',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '0.5rem'
+                    }}
+                  >
+                    <CheckCircle size={20} />
+                    Salvar Prólogo
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* EPÍLOGO */}
+            <div style={{
+              background: isDark ? 'rgba(26, 26, 46, 0.6)' : 'white',
+              padding: '2rem',
+              borderRadius: '16px',
+              border: `2px solid ${isDark ? 'rgba(212, 175, 55, 0.3)' : 'rgba(139, 115, 85, 0.2)'}`,
+              boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1.5rem' }}>
+                <Sunset size={28} color={isDark ? '#b19cd9' : '#9c27b0'} />
+                <h2 style={{
+                  margin: 0,
+                  fontSize: '1.8rem',
+                  color: isDark ? '#f0e6d2' : '#2c1810'
+                }}>
+                  Epílogo Noturno
+                </h2>
+              </div>
+
+              {eveningDone ? (
+                <div style={{
+                  padding: '1.5rem',
+                  background: isDark ? 'rgba(76, 175, 80, 0.2)' : '#e8f5e9',
+                  borderRadius: '12px',
+                  border: `2px solid ${isDark ? 'rgba(76, 175, 80, 0.4)' : '#4caf50'}`
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem' }}>
+                    <CheckCircle size={24} color="#4caf50" />
+                    <h3 style={{ margin: 0, color: isDark ? '#81c784' : '#2e7d32' }}>
+                      Epílogo Completo!
+                    </h3>
+                  </div>
+                  <p style={{ color: isDark ? '#c8e6c9' : '#1b5e20' }}>
+                    Exame noturno realizado. Descanse bem! 🌙
+                  </p>
+                </div>
+              ) : (
+                <div>
+                  <p style={{
+                    marginBottom: '1.5rem',
+                    color: isDark ? '#b8a88a' : '#6b5744',
+                    fontStyle: 'italic'
+                  }}>
+                    "Que ninguém durma sem antes examinar as ações do dia" — Versos de Ouro de Pitágoras
+                  </p>
+
+                  <div style={{ marginBottom: '1.5rem' }}>
+                    <label style={{
+                      display: 'block',
+                      marginBottom: '0.5rem',
+                      fontWeight: 600,
+                      color: isDark ? '#f0e6d2' : '#2c1810'
+                    }}>
+                      1. Em que falhei hoje?
+                    </label>
+                    <textarea
+                      value={whereIFailed}
+                      onChange={(e) => setWhereIFailed(e.target.value)}
+                      placeholder="Onde não agi conforme meus princípios?"
+                      rows={4}
+                      style={{
+                        width: '100%',
+                        padding: '0.75rem',
+                        border: `2px solid ${isDark ? 'rgba(212, 175, 55, 0.5)' : '#8b7355'}`,
+                        borderRadius: '8px',
+                        fontSize: '1rem',
+                        fontFamily: 'Georgia, serif',
+                        background: isDark ? 'rgba(26, 26, 46, 0.8)' : 'white',
+                        color: isDark ? '#f0e6d2' : '#2c1810',
+                        resize: 'vertical'
+                      }}
+                    />
+                  </div>
+
+                  <div style={{ marginBottom: '1.5rem' }}>
+                    <label style={{
+                      display: 'block',
+                      marginBottom: '0.5rem',
+                      fontWeight: 600,
+                      color: isDark ? '#f0e6d2' : '#2c1810'
+                    }}>
+                      2. O que fiz bem?
+                    </label>
+                    <textarea
+                      value={whatIDidWell}
+                      onChange={(e) => setWhatIDidWell(e.target.value)}
+                      placeholder="Quais virtudes pratiquei?"
+                      rows={4}
+                      style={{
+                        width: '100%',
+                        padding: '0.75rem',
+                        border: `2px solid ${isDark ? 'rgba(212, 175, 55, 0.5)' : '#8b7355'}`,
+                        borderRadius: '8px',
+                        fontSize: '1rem',
+                        fontFamily: 'Georgia, serif',
+                        background: isDark ? 'rgba(26, 26, 46, 0.8)' : 'white',
+                        color: isDark ? '#f0e6d2' : '#2c1810',
+                        resize: 'vertical'
+                      }}
+                    />
+                  </div>
+
+                  <div style={{ marginBottom: '1.5rem' }}>
+                    <label style={{
+                      display: 'block',
+                      marginBottom: '0.5rem',
+                      fontWeight: 600,
+                      color: isDark ? '#f0e6d2' : '#2c1810'
+                    }}>
+                      3. O que deixei de fazer?
+                    </label>
+                    <textarea
+                      value={whatILeftUndone}
+                      onChange={(e) => setWhatILeftUndone(e.target.value)}
+                      placeholder="O que poderia ter feito melhor?"
+                      rows={4}
+                      style={{
+                        width: '100%',
+                        padding: '0.75rem',
+                        border: `2px solid ${isDark ? 'rgba(212, 175, 55, 0.5)' : '#8b7355'}`,
+                        borderRadius: '8px',
+                        fontSize: '1rem',
+                        fontFamily: 'Georgia, serif',
+                        background: isDark ? 'rgba(26, 26, 46, 0.8)' : 'white',
+                        color: isDark ? '#f0e6d2' : '#2c1810',
+                        resize: 'vertical'
+                      }}
+                    />
+                  </div>
+
+                  <button
+                    onClick={saveEvening}
+                    style={{
+                      width: '100%',
+                      padding: '1rem',
+                      background: isDark ? '#b19cd9' : '#9c27b0',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '8px',
+                      fontSize: '1.1rem',
+                      fontWeight: 'bold',
+                      cursor: 'pointer',
+                      fontFamily: 'Georgia, serif',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '0.5rem'
+                    }}
+                  >
+                    <CheckCircle size={20} />
+                    Salvar Epílogo
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* VIEW: HISTORY */}
+        {view === 'history' && (
+          <div>
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginBottom: '2rem',
+              flexWrap: 'wrap',
+              gap: '1rem'
+            }}>
+              <h2 style={{
+                margin: 0,
+                fontSize: '1.8rem',
+                color: isDark ? '#f0e6d2' : '#2c1810'
+              }}>
+                Histórico de Reflexões
+              </h2>
+
+              <button
+                onClick={exportToCSV}
+                disabled={entries.length === 0}
+                style={{
+                  padding: '0.75rem 1.5rem',
+                  background: entries.length > 0 ? (isDark ? '#d4af37' : '#8b7355') : '#ccc',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '8px',
+                  cursor: entries.length > 0 ? 'pointer' : 'not-allowed',
+                  fontFamily: 'Georgia, serif',
+                  fontWeight: 600,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem'
+                }}
+              >
+                <Download size={18} />
+                Exportar CSV
+              </button>
+            </div>
+
+            {/* Busca */}
+            <div style={{ marginBottom: '2rem' }}>
+              <div style={{ position: 'relative' }}>
+                <Search 
+                  size={20} 
+                  color={isDark ? '#d4af37' : '#8b7355'}
+                  style={{
+                    position: 'absolute',
+                    left: '1rem',
+                    top: '50%',
+                    transform: 'translateY(-50%)'
+                  }}
+                />
+                <input
+                  type="text"
+                  placeholder="Buscar nas reflexões..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem 0.75rem 0.75rem 3rem',
+                    border: `2px solid ${isDark ? 'rgba(212, 175, 55, 0.5)' : '#8b7355'}`,
+                    borderRadius: '8px',
+                    fontSize: '1rem',
+                    fontFamily: 'Georgia, serif',
+                    background: isDark ? 'rgba(26, 26, 46, 0.8)' : 'white',
+                    color: isDark ? '#f0e6d2' : '#2c1810'
+                  }}
+                />
+              </div>
+            </div>
+
+            {/* Lista de Entradas */}
+            {filteredEntries.length === 0 ? (
+              <div style={{
+                padding: '3rem',
+                textAlign: 'center',
+                background: isDark ? 'rgba(26, 26, 46, 0.6)' : 'white',
+                borderRadius: '16px',
+                border: `2px solid ${isDark ? 'rgba(212, 175, 55, 0.3)' : 'rgba(139, 115, 85, 0.2)'}`
+              }}>
+                <Calendar size={48} color={isDark ? '#d4af37' : '#8b7355'} style={{ margin: '0 auto 1rem' }} />
+                <p style={{ color: isDark ? '#b8a88a' : '#6b5744', fontSize: '1.1rem' }}>
+                  {searchTerm ? 'Nenhuma entrada encontrada' : 'Nenhuma reflexão registrada ainda'}
+                </p>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                {filteredEntries.map((entry) => (
+                  <div
+                    key={entry.id}
+                    style={{
+                      background: isDark ? 'rgba(26, 26, 46, 0.6)' : 'white',
+                      padding: '1.5rem',
+                      borderRadius: '12px',
+                      border: `2px solid ${isDark ? 'rgba(212, 175, 55, 0.3)' : 'rgba(139, 115, 85, 0.2)'}`,
+                      boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+                    }}
+                  >
+                    <div style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      marginBottom: '1rem',
+                      flexWrap: 'wrap',
+                      gap: '0.5rem'
+                    }}>
+                      <div>
+                        <h3 style={{
+                          margin: 0,
+                          color: isDark ? '#d4af37' : '#8b7355',
+                          fontSize: '1.2rem'
+                        }}>
+                          {new Date(entry.date).toLocaleDateString('pt-BR', {
+                            weekday: 'long',
+                            year: 'numeric',
+                            month: 'long',
+                            day: 'numeric'
+                          })}
+                        </h3>
+                        {entry.virtue && (
+                          <p style={{
+                            margin: '0.25rem 0 0 0',
+                            color: isDark ? '#b8a88a' : '#6b5744',
+                            fontSize: '0.9rem'
+                          }}>
+                            Virtude: <strong>{entry.virtue}</strong>
+                          </p>
+                        )}
+                      </div>
+
+                      <button
+                        onClick={() => deleteEntry(entry.date)}
+                        style={{
+                          padding: '0.5rem',
+                          background: 'transparent',
+                          color: '#e74c3c',
+                          border: '2px solid #e74c3c',
+                          borderRadius: '8px',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.5rem'
+                        }}
+                      >
+                        <X size={16} />
+                      </button>
+                    </div>
+
+                    {entry.intention && (
+                      <div style={{ marginBottom: '1rem' }}>
+                        <h4 style={{
+                          margin: '0 0 0.5rem 0',
+                          color: isDark ? '#f0e6d2' : '#2c1810',
+                          fontSize: '1rem'
+                        }}>
+                          Compromisso:
+                        </h4>
+                        <p style={{
+                          margin: 0,
+                          color: isDark ? '#c8b896' : '#6b5744',
+                          lineHeight: '1.6'
+                        }}>
+                          {entry.intention}
+                        </p>
+                      </div>
+                    )}
+
+                    <div style={{ marginBottom: '1rem' }}>
+                      <h4 style={{
+                        margin: '0 0 0.5rem 0',
+                        color: isDark ? '#f0e6d2' : '#2c1810',
+                        fontSize: '1rem'
+                      }}>
+                        Em que falhei:
+                      </h4>
+                      <p style={{
+                        margin: 0,
+                        color: isDark ? '#c8b896' : '#6b5744',
+                        lineHeight: '1.6'
+                      }}>
+                        {entry.whereIFailed}
+                      </p>
+                    </div>
+
+                    <div style={{ marginBottom: '1rem' }}>
+                      <h4 style={{
+                        margin: '0 0 0.5rem 0',
+                        color: isDark ? '#f0e6d2' : '#2c1810',
+                        fontSize: '1rem'
+                      }}>
+                        O que fiz bem:
+                      </h4>
+                      <p style={{
+                        margin: 0,
+                        color: isDark ? '#c8b896' : '#6b5744',
+                        lineHeight: '1.6'
+                      }}>
+                        {entry.whatIDidWell}
+                      </p>
+                    </div>
+
+                    <div>
+                      <h4 style={{
+                        margin: '0 0 0.5rem 0',
+                        color: isDark ? '#f0e6d2' : '#2c1810',
+                        fontSize: '1rem'
+                      }}>
+                        O que deixei de fazer:
+                      </h4>
+                      <p style={{
+                        margin: 0,
+                        color: isDark ? '#c8b896' : '#6b5744',
+                        lineHeight: '1.6'
+                      }}>
+                        {entry.whatILeftUndone}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+      </main>
+
+      {/* Footer */}
+      <footer style={{
+        padding: '2rem',
+        textAlign: 'center',
+        color: isDark ? '#b8a88a' : '#6b5744',
+        borderTop: `1px solid ${isDark ? 'rgba(212, 175, 55, 0.2)' : 'rgba(139, 115, 85, 0.2)'}`,
+        marginTop: '2rem'
+      }}>
+        <p style={{ margin: 0, fontSize: '0.95rem', fontStyle: 'italic' }}>
+          "Que ninguém durma sem antes examinar as ações do dia"
+        </p>
+        <p style={{ margin: '0.5rem 0 0 0', fontSize: '0.85rem', opacity: 0.8 }}>
+          Nova Acrópole · Filosofia à Maneira Clássica
+        </p>
+      </footer>
+    </div>
+  );
+}
+
+export default App;
