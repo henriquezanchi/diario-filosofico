@@ -617,43 +617,45 @@ function App() {
     reader.readAsText(file);
   };
 
-  const importFromCSV = async (content) => {
-    const lines = content.split('\n').slice(1); // Pular cabeçalho
-    let imported = 0;
+const importFromCSV = async (content) => {
+  const lines = content.split('\n').slice(1); // Pular cabeçalho
+  let imported = 0;
 
-    for (const line of lines) {
-  if (!line.trim()) continue;
+  for (const line of lines) {
+    if (!line.trim()) continue;
 
-  const parts = line.split(',').map(p => p.replace(/^"|"$/g, '').replace(/""/g, '"'));
-  if (parts.length < 6) continue;
+    // REGEX CORRIGIDA - EM UMA LINHA SÓ
+    const parts = line.split(',').map(p => p.replace(/^"|"$/g, '').replace(/""/g, '"'));
+    if (parts.length < 6) continue;
 
-  const [date, didMorningStr, virtue, intention, whereIFailed, whatIDidWell, whatILeftUndone] = parts;
+    const [date, didMorningStr, virtue, intention, whereIFailed, whatIDidWell, whatILeftUndone] = parts;
 
-      const entry = {
-        userId: user.uid,
-        date,
-        didMorning: didMorningStr === 'Sim',
-        virtue,
-        intention,
-        whereIFailed,
-        whatIDidWell,
-        whatILeftUndone,
-        morningDone: true,
-        eveningDone: true,
-        importedAt: Timestamp.now()
-      };
+    const entry = {
+      userId: user.uid,
+      date,
+      didMorning: didMorningStr === 'Sim',
+      virtue,
+      intention,
+      whereIFailed,
+      whatIDidWell,
+      whatILeftUndone,
+      morningDone: true,
+      eveningDone: true,
+      importedAt: Timestamp.now()
+    };
 
-      try {
-        await setDoc(doc(db, 'entries', `${user.uid}_${date}`), entry);
-        imported++;
-      } catch (error) {
-        console.error(`Erro ao importar ${date}`);
-      }
+    try {
+      await setDoc(doc(db, 'entries', `${user.uid}_${date}`), entry);
+      imported++;
+    } catch (error) {
+      console.error(`Erro ao importar ${date}`);
     }
+  }
 
-    await loadAllEntries(user.uid);
-    alert(`✅ ${imported} entradas importadas com sucesso!`);
-  };
+  await loadAllEntries(user.uid);
+  alert(`✅ ${imported} entradas importadas com sucesso!`);
+};
+
 
   const importFromJSON = async (content) => {
     const data = JSON.parse(content);
