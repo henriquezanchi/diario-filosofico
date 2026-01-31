@@ -2,7 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { 
   BookOpen, Sunrise, Sunset, Search, Calendar, Moon, Sun, 
   Sparkles, ChevronRight, LogOut, Shuffle, Plus, X, 
-  AlertCircle, Eye, EyeOff, CheckCircle, Download, Upload
+  AlertCircle, Eye, EyeOff, CheckCircle, Download, Upload,
+  Target, TrendingUp, Award, FileText, Book, Settings,
+  Trash2, Edit, Save, XCircle
 } from 'lucide-react';
 import { auth, db } from './config/firebase-config';
 import { 
@@ -51,104 +53,164 @@ function App() {
 
   // Estados do Epílogo
   const [eveningDone, setEveningDone] = useState(false);
+  const [didMorning, setDidMorning] = useState(true); // NOVO
   const [whereIFailed, setWhereIFailed] = useState('');
   const [whatIDidWell, setWhatIDidWell] = useState('');
   const [whatILeftUndone, setWhatILeftUndone] = useState('');
 
+  // Estados de Tarefas Personalizadas (NOVO)
+  const [customTasks, setCustomTasks] = useState([]);
+  const [newTaskName, setNewTaskName] = useState('');
+  const [showAddTask, setShowAddTask] = useState(false);
+  const [todayTasksStatus, setTodayTasksStatus] = useState({});
+
+  // Estados de Metas de Longo Prazo (NOVO)
+  const [yearGoals, setYearGoals] = useState('');
+  const [lifeGoals, setLifeGoals] = useState('');
+  const [showGoalsEditor, setShowGoalsEditor] = useState(false);
+
+  // Estados de Biblioteca de Virtudes (NOVO)
+  const [selectedVirtueDetail, setSelectedVirtueDetail] = useState(null);
+
   // Estados de Histórico
   const [entries, setEntries] = useState([]);
 
-  // Virtudes
+  // Estados FV (oculto) (NOVO)
+  const [fvUnlocked, setFvUnlocked] = useState(false);
+  const [fvClickCount, setFvClickCount] = useState(0);
+  const [fvCartaDegrau, setFvCartaDegrau] = useState('');
+  const [fvLastCartaDate, setFvLastCartaDate] = useState(null);
+  const [fvNextCartaDate, setFvNextCartaDate] = useState(null);
+  const [fvGdveDesafios, setFvGdveDesafios] = useState([]);
+  const [fvGdveReuniao, setFvGdveReuniao] = useState('');
+
+  // Virtudes expandidas
   const virtues = [
     {
       name: "Paciência",
+      shortDesc: "Suportar dificuldades mantendo a serenidade",
       description: "A capacidade de suportar dificuldades sem se perturbar, mantendo a serenidade diante das adversidades e do tempo necessário para as coisas se realizarem.",
-      practices: "Respirar profundamente antes de reagir; Observar a irritação sem agir impulsivamente; Lembrar que tudo tem seu tempo."
+      practices: "• Respirar profundamente antes de reagir\n• Observar a irritação sem agir impulsivamente\n• Lembrar que tudo tem seu tempo",
+      color: "#4A90E2"
     },
     {
       name: "Ordem",
+      shortDesc: "Harmonia no mundo exterior e interior",
       description: "Disposição harmoniosa das coisas em seu devido lugar, tanto no mundo exterior quanto no interior.",
-      practices: "Organizar espaço físico; Criar rotinas conscientes; Planejar o dia com antecedência."
+      practices: "• Organizar espaço físico diariamente\n• Criar rotinas conscientes\n• Planejar o dia com antecedência",
+      color: "#7B68EE"
     },
     {
       name: "Generosidade",
-      description: "Dar livremente sem esperar retorno, compartilhar tempo, atenção, recursos e conhecimento com quem necessita.",
-      practices: "Oferecer ajuda sem ser pedido; Compartilhar conhecimento; Doar tempo e atenção genuína."
+      shortDesc: "Dar livremente sem esperar retorno",
+      description: "Compartilhar tempo, atenção, recursos e conhecimento com quem necessita, sem expectativa de recompensa.",
+      practices: "• Oferecer ajuda sem ser pedido\n• Compartilhar conhecimento\n• Doar tempo e atenção genuína",
+      color: "#50C878"
     },
     {
       name: "Coragem",
+      shortDesc: "Agir corretamente mesmo sob pressão",
       description: "Força interior para enfrentar o medo, agir corretamente mesmo sob pressão e defender princípios mesmo quando difícil.",
-      practices: "Fazer o certo mesmo com medo; Falar a verdade com tato; Enfrentar desafios ao invés de evitá-los."
+      practices: "• Fazer o certo mesmo com medo\n• Falar a verdade com tato\n• Enfrentar desafios ao invés de evitá-los",
+      color: "#E74C3C"
     },
     {
       name: "Temperança",
+      shortDesc: "Moderação e equilíbrio",
       description: "Moderação em todas as coisas, equilíbrio entre extremos, domínio sobre impulsos e desejos desmedidos.",
-      practices: "Evitar excessos; Buscar o meio-termo; Dominar impulsos automáticos."
+      practices: "• Evitar excessos em todas as áreas\n• Buscar o meio-termo\n• Dominar impulsos automáticos",
+      color: "#9B59B6"
     },
     {
       name: "Honestidade",
-      description: "Viver em consonância com a verdade, ser íntegro em palavras e ações.",
-      practices: "Falar a verdade com compaixão; Reconhecer erros; Ser transparente nas intenções."
+      shortDesc: "Viver em consonância com a verdade",
+      description: "Ser íntegro em palavras e ações, não enganar a si mesmo nem aos outros.",
+      practices: "• Falar a verdade com compaixão\n• Reconhecer erros abertamente\n• Ser transparente nas intenções",
+      color: "#3498DB"
     },
     {
       name: "Humildade",
-      description: "Reconhecer limitações sem falsa modéstia, estar aberto a aprender.",
-      practices: "Ouvir mais que falar; Reconhecer que sempre há mais a aprender; Aceitar críticas construtivas."
+      shortDesc: "Reconhecer limitações e estar aberto",
+      description: "Reconhecer limitações sem falsa modéstia, estar aberto a aprender, não se colocar acima dos outros.",
+      practices: "• Ouvir mais que falar\n• Reconhecer que sempre há mais a aprender\n• Aceitar críticas construtivas",
+      color: "#95A5A6"
     },
     {
       name: "Disciplina",
-      description: "Capacidade de manter compromissos consigo mesmo.",
-      practices: "Cumprir pequenos compromissos diários; Manter práticas mesmo sem vontade; Criar e seguir uma rotina."
+      shortDesc: "Manter compromissos consigo mesmo",
+      description: "Capacidade de seguir princípios escolhidos mesmo sem supervisão externa.",
+      practices: "• Cumprir pequenos compromissos diários\n• Manter práticas mesmo sem vontade\n• Criar e seguir uma rotina",
+      color: "#34495E"
     },
     {
       name: "Compaixão",
-      description: "Sentir com o outro, compreender o sofrimento alheio.",
-      practices: "Ver além das aparências; Oferecer presença empática; Perdoar falhas humanas."
+      shortDesc: "Sentir com o outro",
+      description: "Compreender o sofrimento alheio e agir para aliviá-lo quando possível.",
+      practices: "• Ver além das aparências\n• Oferecer presença empática\n• Perdoar falhas humanas",
+      color: "#E67E22"
     },
     {
       name: "Prudência",
-      description: "Sabedoria prática para avaliar situações e tomar decisões ponderadas.",
-      practices: "Pensar antes de agir; Considerar consequências; Buscar conselho quando necessário."
+      shortDesc: "Sabedoria prática",
+      description: "Avaliar situações, prever consequências e tomar decisões ponderadas.",
+      practices: "• Pensar antes de agir\n• Considerar consequências\n• Buscar conselho quando necessário",
+      color: "#16A085"
     },
     {
       name: "Justiça",
-      description: "Dar a cada um o que lhe é devido, agir com equidade.",
-      practices: "Tratar todos com equidade; Cumprir compromissos; Reconhecer méritos alheios."
+      shortDesc: "Dar a cada um o que lhe é devido",
+      description: "Agir com equidade, respeitar direitos e cumprir deveres.",
+      practices: "• Tratar todos com equidade\n• Cumprir compromissos assumidos\n• Reconhecer méritos alheios",
+      color: "#C0392B"
     },
     {
       name: "Gratidão",
-      description: "Reconhecer e valorizar o que se recebe.",
-      practices: "Agradecer diariamente; Valorizar pequenas coisas; Expressar reconhecimento."
+      shortDesc: "Reconhecer e valorizar",
+      description: "Cultivar apreciação pelas bênçãos da vida.",
+      practices: "• Agradecer diariamente por três coisas\n• Valorizar pequenas coisas\n• Expressar reconhecimento aos outros",
+      color: "#F39C12"
     },
     {
       name: "Serenidade",
-      description: "Paz interior que não se abala com as circunstâncias externas.",
-      practices: "Meditar regularmente; Não reagir automaticamente; Cultivar paz interior."
+      shortDesc: "Paz interior",
+      description: "Tranquilidade da mente e do coração independente das circunstâncias.",
+      practices: "• Meditar regularmente\n• Não reagir automaticamente\n• Cultivar paz interior através da contemplação",
+      color: "#1ABC9C"
     },
     {
       name: "Diligência",
-      description: "Aplicação cuidadosa e persistente no cumprimento de tarefas.",
-      practices: "Fazer cada tarefa com atenção plena; Não deixar para depois; Completar o que começou."
+      shortDesc: "Aplicação cuidadosa",
+      description: "Fazer bem o que precisa ser feito, com atenção e dedicação.",
+      practices: "• Fazer cada tarefa com atenção plena\n• Não deixar para depois\n• Completar o que começou",
+      color: "#2ECC71"
     },
     {
       name: "Bondade",
-      description: "Inclinação natural para o bem, agir com gentileza.",
-      practices: "Fazer pequenos gestos gentis; Falar palavras encorajadoras; Agir com benevolência."
+      shortDesc: "Inclinação natural para o bem",
+      description: "Agir com gentileza e benevolência em todas as circunstâncias.",
+      practices: "• Fazer pequenos gestos gentis diariamente\n• Falar palavras encorajadoras\n• Agir com benevolência mesmo quando difícil",
+      color: "#FF69B4"
     },
     {
       name: "Sabedoria",
-      description: "Conhecimento aplicado com discernimento.",
-      practices: "Estudar filosofia; Refletir sobre experiências; Buscar compreensão profunda."
+      shortDesc: "Conhecimento com discernimento",
+      description: "Compreensão profunda da vida e capacidade de ver a essência das coisas.",
+      practices: "• Estudar filosofia regularmente\n• Refletir sobre experiências\n• Buscar compreensão profunda, não superficial",
+      color: "#8E44AD"
     },
     {
       name: "Fortaleza",
-      description: "Resistência interior para perseverar em objetivos nobres.",
-      practices: "Perseverar em objetivos; Manter-se firme em princípios; Não desistir facilmente."
+      shortDesc: "Resistência interior",
+      description: "Perseverar em objetivos nobres mesmo diante de dificuldades prolongadas.",
+      practices: "• Perseverar em objetivos importantes\n• Manter-se firme em princípios\n• Não desistir facilmente",
+      color: "#D35400"
     },
     {
       name: "Fraternidade",
-      description: "Reconhecer a unidade essencial de todos os seres.",
-      practices: "Ver a humanidade comum; Ajudar sem distinção; Cultivar sentimento de união."
+      shortDesc: "Reconhecer a unidade",
+      description: "Tratar os outros como irmãos na jornada humana.",
+      practices: "• Ver a humanidade comum em todos\n• Ajudar sem distinção\n• Cultivar sentimento de união",
+      color: "#27AE60"
     }
   ];
 
@@ -173,6 +235,20 @@ function App() {
   const canDrawToday = () => {
     const today = getTodayKey();
     return lastDrawDate !== today;
+  };
+
+  // NOVO: Função para desbloquear FV (7 cliques no logo)
+  const handleLogoClick = () => {
+    setFvClickCount(prev => prev + 1);
+    if (fvClickCount >= 6) {
+      setFvUnlocked(true);
+      setFvClickCount(0);
+      if (user) {
+        updateDoc(doc(db, 'users', user.uid), { fvUnlocked: true });
+      }
+      alert('🔓 Modo FV desbloqueado!');
+    }
+    setTimeout(() => setFvClickCount(0), 3000);
   };
 
   // Sortear virtude (só uma vez por dia)
@@ -209,6 +285,9 @@ function App() {
         await loadUserData(currentUser.uid);
         await loadTodayEntry(currentUser.uid);
         await loadAllEntries(currentUser.uid);
+        await loadCustomTasks(currentUser.uid);
+        await loadLongTermGoals(currentUser.uid);
+        await loadFVData(currentUser.uid);
       } else {
         setUser(null);
       }
@@ -226,11 +305,13 @@ function App() {
         const data = userDoc.data();
         setTheme(data.theme || 'light');
         setLastDrawDate(data.lastDrawDate || null);
+        setFvUnlocked(data.fvUnlocked || false);
       } else {
         await setDoc(doc(db, 'users', uid), {
           createdAt: Timestamp.now(),
           theme: 'light',
-          lastDrawDate: null
+          lastDrawDate: null,
+          fvUnlocked: false
         });
       }
     } catch (error) {
@@ -248,13 +329,17 @@ function App() {
         setMorningDone(data.morningDone || false);
         setSelectedVirtue(data.virtue || '');
         setCustomVirtue(data.customVirtue || '');
-        setDailyQuote(data.quote || null);
         setDailyIntention(data.intention || '');
         setEveningDone(data.eveningDone || false);
         setWhereIFailed(data.whereIFailed || '');
         setWhatIDidWell(data.whatIDidWell || '');
         setWhatILeftUndone(data.whatILeftUndone || '');
-      } else {
+        setDidMorning(data.didMorning !== false);
+        setDailyQuote(data.quote || null);
+        setTodayTasksStatus(data.tasksStatus || {});
+      }
+
+      if (!dailyQuote) {
         const randomQuote = philosophicalQuotes[Math.floor(Math.random() * philosophicalQuotes.length)];
         setDailyQuote(randomQuote);
       }
@@ -287,6 +372,81 @@ function App() {
     }
   };
 
+  // NOVO: Carregar tarefas personalizadas
+  const loadCustomTasks = async (uid) => {
+    try {
+      const tasksDoc = await getDoc(doc(db, 'customTasks', uid));
+      if (tasksDoc.exists()) {
+        setCustomTasks(tasksDoc.data().tasks || []);
+      }
+    } catch (error) {
+      console.error('Erro ao carregar tarefas:', error);
+    }
+  };
+
+  // NOVO: Carregar metas de longo prazo
+  const loadLongTermGoals = async (uid) => {
+    try {
+      const goalsDoc = await getDoc(doc(db, 'longTermGoals', uid));
+      if (goalsDoc.exists()) {
+        const data = goalsDoc.data();
+        setYearGoals(data.yearGoals || '');
+        setLifeGoals(data.lifeGoals || '');
+      }
+    } catch (error) {
+      console.error('Erro ao carregar metas:', error);
+    }
+  };
+
+  // NOVO: Carregar dados FV
+  const loadFVData = async (uid) => {
+    try {
+      const fvDoc = await getDoc(doc(db, 'fvData', uid));
+      if (fvDoc.exists()) {
+        const data = fvDoc.data();
+        setFvCartaDegrau(data.cartaDegrau || '');
+        setFvLastCartaDate(data.lastCartaDate || null);
+        setFvNextCartaDate(data.nextCartaDate || null);
+        setFvGdveDesafios(data.gdveDesafios || []);
+        setFvGdveReuniao(data.gdveReuniao || '');
+      }
+    } catch (error) {
+      console.error('Erro ao carregar dados FV:', error);
+    }
+  };
+
+  // NOVO: Adicionar tarefa personalizada
+  const addCustomTask = async () => {
+    if (!newTaskName.trim()) return;
+
+    const newTasks = [...customTasks, { id: Date.now(), name: newTaskName }];
+    setCustomTasks(newTasks);
+    setNewTaskName('');
+    setShowAddTask(false);
+
+    if (user) {
+      await setDoc(doc(db, 'customTasks', user.uid), { tasks: newTasks });
+    }
+  };
+
+  // NOVO: Remover tarefa personalizada
+  const removeCustomTask = async (taskId) => {
+    const newTasks = customTasks.filter(t => t.id !== taskId);
+    setCustomTasks(newTasks);
+
+    if (user) {
+      await setDoc(doc(db, 'customTasks', user.uid), { tasks: newTasks });
+    }
+  };
+
+  // NOVO: Marcar/desmarcar tarefa do dia
+  const toggleTaskStatus = (taskId) => {
+    setTodayTasksStatus(prev => ({
+      ...prev,
+      [taskId]: !prev[taskId]
+    }));
+  };
+
   // Salvar Prólogo
   const saveMorning = async () => {
     const finalVirtue = showCustomVirtue ? customVirtue : selectedVirtue;
@@ -305,6 +465,7 @@ function App() {
       customVirtue: showCustomVirtue ? customVirtue : '',
       quote: dailyQuote,
       intention: dailyIntention,
+      tasksStatus: todayTasksStatus,
       morningTimestamp: Timestamp.now()
     };
 
@@ -338,6 +499,7 @@ function App() {
         whereIFailed,
         whatIDidWell,
         whatILeftUndone,
+        didMorning, // NOVO
         eveningTimestamp: Timestamp.now()
       };
 
@@ -347,6 +509,42 @@ function App() {
       alert('✅ Epílogo salvo com sucesso!');
     } catch (error) {
       alert('Erro ao salvar epílogo. Tente novamente.');
+    }
+  };
+
+  // NOVO: Salvar metas de longo prazo
+  const saveLongTermGoals = async () => {
+    if (user) {
+      try {
+        await setDoc(doc(db, 'longTermGoals', user.uid), {
+          yearGoals,
+          lifeGoals,
+          updatedAt: Timestamp.now()
+        });
+        setShowGoalsEditor(false);
+        alert('✅ Metas salvas com sucesso!');
+      } catch (error) {
+        alert('Erro ao salvar metas.');
+      }
+    }
+  };
+
+  // NOVO: Salvar dados FV
+  const saveFVData = async () => {
+    if (user) {
+      try {
+        await setDoc(doc(db, 'fvData', user.uid), {
+          cartaDegrau: fvCartaDegrau,
+          lastCartaDate: fvLastCartaDate,
+          nextCartaDate: fvNextCartaDate,
+          gdveDesafios: fvGdveDesafios,
+          gdveReuniao: fvGdveReuniao,
+          updatedAt: Timestamp.now()
+        });
+        alert('✅ Dados FV salvos!');
+      } catch (error) {
+        alert('Erro ao salvar dados FV.');
+      }
     }
   };
 
@@ -369,9 +567,10 @@ function App() {
       return;
     }
 
-    const headers = ['Data', 'Virtude', 'Compromisso', 'Onde Errei', 'O Que Fiz Bem', 'O Que Deixei de Fazer'];
+    const headers = ['Data', 'Fez Prólogo', 'Virtude', 'Compromisso', 'Onde Errei', 'O Que Fiz Bem', 'O Que Deixei de Fazer'];
     const rows = entries.map(entry => [
       entry.date,
+      entry.didMorning ? 'Sim' : 'Não',
       entry.virtue || '',
       entry.intention || '',
       entry.whereIFailed || '',
@@ -389,6 +588,138 @@ function App() {
     link.href = URL.createObjectURL(blob);
     link.download = `diario-filosofico-${getTodayKey()}.csv`;
     link.click();
+  };
+
+  // NOVO: Importar diários
+  const importDiary = (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      try {
+        const content = e.target.result;
+
+        // Detectar formato
+        if (file.name.endsWith('.csv')) {
+          await importFromCSV(content);
+        } else if (file.name.endsWith('.json')) {
+          await importFromJSON(content);
+        } else if (file.name.endsWith('.txt')) {
+          await importFromTXT(content);
+        } else {
+          alert('Formato não suportado. Use CSV, JSON ou TXT.');
+        }
+      } catch (error) {
+        alert('Erro ao importar arquivo.');
+      }
+    };
+    reader.readAsText(file);
+  };
+
+  const importFromCSV = async (content) => {
+    const lines = content.split('\n').slice(1); // Pular cabeçalho
+    let imported = 0;
+
+    for (const line of lines) {
+  if (!line.trim()) continue;
+
+  const parts = line.split(',').map(p => p.replace(/^"|"$/g, '').replace(/""/g, '"'));
+  if (parts.length < 6) continue;
+
+  const [date, didMorningStr, virtue, intention, whereIFailed, whatIDidWell, whatILeftUndone] = parts;
+
+      const entry = {
+        userId: user.uid,
+        date,
+        didMorning: didMorningStr === 'Sim',
+        virtue,
+        intention,
+        whereIFailed,
+        whatIDidWell,
+        whatILeftUndone,
+        morningDone: true,
+        eveningDone: true,
+        importedAt: Timestamp.now()
+      };
+
+      try {
+        await setDoc(doc(db, 'entries', `${user.uid}_${date}`), entry);
+        imported++;
+      } catch (error) {
+        console.error(`Erro ao importar ${date}`);
+      }
+    }
+
+    await loadAllEntries(user.uid);
+    alert(`✅ ${imported} entradas importadas com sucesso!`);
+  };
+
+  const importFromJSON = async (content) => {
+    const data = JSON.parse(content);
+    let imported = 0;
+
+    for (const entry of data) {
+      if (!entry.date) continue;
+
+      const newEntry = {
+        ...entry,
+        userId: user.uid,
+        importedAt: Timestamp.now()
+      };
+
+      try {
+        await setDoc(doc(db, 'entries', `${user.uid}_${entry.date}`), newEntry);
+        imported++;
+      } catch (error) {
+        console.error(`Erro ao importar ${entry.date}`);
+      }
+    }
+
+    await loadAllEntries(user.uid);
+    alert(`✅ ${imported} entradas importadas com sucesso!`);
+  };
+
+  const importFromTXT = async (content) => {
+    // Formato simples: cada entrada separada por "---"
+    const entriesText = content.split('---');
+    let imported = 0;
+
+    for (const entryText of entriesText) {
+      if (!entryText.trim()) continue;
+
+      const lines = entryText.trim().split('\n');
+      const entry = {
+        userId: user.uid,
+        date: getTodayKey(),
+        whereIFailed: '',
+        whatIDidWell: '',
+        whatILeftUndone: '',
+        morningDone: false,
+        eveningDone: true,
+        importedAt: Timestamp.now()
+      };
+
+      lines.forEach(line => {
+        if (line.startsWith('Data:')) entry.date = line.replace('Data:', '').trim();
+        if (line.startsWith('Virtude:')) entry.virtue = line.replace('Virtude:', '').trim();
+        if (line.startsWith('Onde errei:')) entry.whereIFailed = line.replace('Onde errei:', '').trim();
+        if (line.startsWith('O que fiz bem:')) entry.whatIDidWell = line.replace('O que fiz bem:', '').trim();
+        if (line.startsWith('O que deixei:')) entry.whatILeftUndone = line.replace('O que deixei:', '').trim();
+      });
+
+      if (entry.date && entry.whereIFailed) {
+        try {
+          await setDoc(doc(db, 'entries', `${user.uid}_${entry.date}`), entry);
+          imported++;
+        } catch (error) {
+          console.error(`Erro ao importar ${entry.date}`);
+        }
+      }
+    }
+
+    await loadAllEntries(user.uid);
+    alert(`✅ ${imported} entradas importadas com sucesso!`);
   };
 
   // Autenticação
@@ -443,7 +774,8 @@ function App() {
 
   const isDark = theme === 'dark';
 
-  // O código continua... (devido ao limite de caracteres, vou dividir em partes)
+  // O código continua... (vou enviar a parte visual na próxima mensagem devido ao limite de caracteres)
+
   // Tela de Loading
   if (loading) {
     return (
@@ -649,12 +981,20 @@ function App() {
           flexWrap: 'wrap',
           gap: '1rem'
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+          <div 
+            onClick={handleLogoClick}
+            style={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: '0.75rem',
+              cursor: 'pointer'
+            }}
+          >
             <BookOpen size={32} color={isDark ? '#d4af37' : '#8b7355'} />
             <h1 style={{
               margin: 0,
               fontFamily: 'Georgia, serif',
-              fontSize: '1.5rem',
+              fontSize: 'clamp(1.2rem, 4vw, 1.5rem)',
               color: isDark ? '#f0e6d2' : '#2c1810',
               fontWeight: 700
             }}>
@@ -698,6 +1038,79 @@ function App() {
             </button>
 
             <button
+              onClick={() => setView('tasks')}
+              style={{
+                padding: '0.5rem 1rem',
+                background: view === 'tasks' ? (isDark ? '#d4af37' : '#8b7355') : 'transparent',
+                color: view === 'tasks' ? (isDark ? '#1a1a2e' : '#f0e6d2') : (isDark ? '#d4af37' : '#8b7355'),
+                border: `2px solid ${isDark ? '#d4af37' : '#8b7355'}`,
+                borderRadius: '8px',
+                cursor: 'pointer',
+                fontFamily: 'Georgia, serif',
+                fontSize: '0.9rem',
+                fontWeight: 600
+              }}
+            >
+              Tarefas
+            </button>
+
+            <button
+              onClick={() => setView('goals')}
+              style={{
+                padding: '0.5rem 1rem',
+                background: view === 'goals' ? (isDark ? '#d4af37' : '#8b7355') : 'transparent',
+                color: view === 'goals' ? (isDark ? '#1a1a2e' : '#f0e6d2') : (isDark ? '#d4af37' : '#8b7355'),
+                border: `2px solid ${isDark ? '#d4af37' : '#8b7355'}`,
+                borderRadius: '8px',
+                cursor: 'pointer',
+                fontFamily: 'Georgia, serif',
+                fontSize: '0.9rem',
+                fontWeight: 600
+              }}
+            >
+              Metas
+            </button>
+
+            <button
+              onClick={() => setView('biblioteca')}
+              style={{
+                padding: '0.5rem 1rem',
+                background: view === 'biblioteca' ? (isDark ? '#d4af37' : '#8b7355') : 'transparent',
+                color: view === 'biblioteca' ? (isDark ? '#1a1a2e' : '#f0e6d2') : (isDark ? '#d4af37' : '#8b7355'),
+                border: `2px solid ${isDark ? '#d4af37' : '#8b7355'}`,
+                borderRadius: '8px',
+                cursor: 'pointer',
+                fontFamily: 'Georgia, serif',
+                fontSize: '0.9rem',
+                fontWeight: 600
+              }}
+            >
+              Virtudes
+            </button>
+
+            {fvUnlocked && (
+              <button
+                onClick={() => setView('fv')}
+                style={{
+                  padding: '0.5rem 1rem',
+                  background: view === 'fv' 
+                    ? 'linear-gradient(135deg, #FFD700 0%, #FFA500 100%)'
+                    : 'transparent',
+                  color: view === 'fv' ? '#000' : '#FFD700',
+                  border: '2px solid #FFD700',
+                  borderRadius: '8px',
+                  cursor: 'pointer',
+                  fontFamily: 'Georgia, serif',
+                  fontSize: '0.9rem',
+                  fontWeight: 600,
+                  boxShadow: '0 0 10px rgba(255, 215, 0, 0.3)'
+                }}
+              >
+                FV
+              </button>
+            )}
+
+            <button
               onClick={toggleTheme}
               style={{
                 padding: '0.5rem',
@@ -731,7 +1144,7 @@ function App() {
               }}
             >
               <LogOut size={16} />
-              Sair
+              <span style={{ display: window.innerWidth > 768 ? 'inline' : 'none' }}>Sair</span>
             </button>
           </div>
         </div>
@@ -758,7 +1171,7 @@ function App() {
                 marginBottom: '2rem'
               }}>
                 <p style={{
-                  fontSize: '1.2rem',
+                  fontSize: 'clamp(1rem, 2vw, 1.2rem)',
                   fontStyle: 'italic',
                   color: isDark ? '#f0e6d2' : '#2c1810',
                   marginBottom: '1rem',
@@ -767,7 +1180,7 @@ function App() {
                   "{dailyQuote.text}"
                 </p>
                 <p style={{
-                  fontSize: '1rem',
+                  fontSize: 'clamp(0.9rem, 1.5vw, 1rem)',
                   color: isDark ? '#b8a88a' : '#6b5744',
                   textAlign: 'right',
                   margin: 0
@@ -777,7 +1190,61 @@ function App() {
               </div>
             )}
 
-            {/* PRÓLOGO */}
+            {/* Tarefas do Dia (se houver) */}
+            {customTasks.length > 0 && (
+              <div style={{
+                background: isDark ? 'rgba(26, 26, 46, 0.6)' : 'white',
+                padding: '1.5rem',
+                borderRadius: '16px',
+                marginBottom: '2rem',
+                border: `2px solid ${isDark ? 'rgba(212, 175, 55, 0.3)' : 'rgba(139, 115, 85, 0.2)'}`
+              }}>
+                <h3 style={{
+                  margin: '0 0 1rem 0',
+                  fontSize: '1.3rem',
+                  color: isDark ? '#f0e6d2' : '#2c1810'
+                }}>
+                  ✓ Tarefas do Dia
+                </h3>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                  {customTasks.map(task => (
+                    <label
+                      key={task.id}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.75rem',
+                        padding: '0.75rem',
+                        background: isDark ? 'rgba(212, 175, 55, 0.1)' : 'rgba(255, 245, 220, 0.3)',
+                        borderRadius: '8px',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s'
+                      }}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={todayTasksStatus[task.id] || false}
+                        onChange={() => toggleTaskStatus(task.id)}
+                        style={{
+                          width: '20px',
+                          height: '20px',
+                          cursor: 'pointer'
+                        }}
+                      />
+                      <span style={{
+                        color: isDark ? '#f0e6d2' : '#2c1810',
+                        textDecoration: todayTasksStatus[task.id] ? 'line-through' : 'none',
+                        opacity: todayTasksStatus[task.id] ? 0.6 : 1
+                      }}>
+                        {task.name}
+                      </span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* PRÓLOGO - Continua igual ao código anterior... */}
             <div style={{
               background: isDark ? 'rgba(26, 26, 46, 0.6)' : 'white',
               padding: '2rem',
@@ -790,7 +1257,7 @@ function App() {
                 <Sunrise size={28} color={isDark ? '#ffd966' : '#ff9800'} />
                 <h2 style={{
                   margin: 0,
-                  fontSize: '1.8rem',
+                  fontSize: 'clamp(1.3rem, 3vw, 1.8rem)',
                   color: isDark ? '#f0e6d2' : '#2c1810'
                 }}>
                   Prólogo Matinal
@@ -849,7 +1316,8 @@ function App() {
                           fontWeight: 600,
                           display: 'flex',
                           alignItems: 'center',
-                          gap: '0.5rem'
+                          gap: '0.5rem',
+                          fontSize: 'clamp(0.85rem, 2vw, 1rem)'
                         }}
                       >
                         <Shuffle size={18} />
@@ -866,10 +1334,11 @@ function App() {
                           borderRadius: '8px',
                           cursor: 'pointer',
                           fontFamily: 'Georgia, serif',
-                          fontWeight: 600
+                          fontWeight: 600,
+                          fontSize: 'clamp(0.85rem, 2vw, 1rem)'
                         }}
                       >
-                        {showCustomVirtue ? 'Escolher da Lista' : 'Escrever Própria Virtude'}
+                        {showCustomVirtue ? 'Escolher da Lista' : 'Escrever Própria'}
                       </button>
                     </div>
 
@@ -932,15 +1401,7 @@ function App() {
                           fontSize: '0.95rem',
                           color: isDark ? '#c8b896' : '#6b5744'
                         }}>
-                          {virtues.find(v => v.name === selectedVirtue)?.description}
-                        </p>
-                        <p style={{ 
-                          margin: '0.5rem 0 0 0', 
-                          fontSize: '0.9rem',
-                          color: isDark ? '#b8a88a' : '#8b7355',
-                          fontStyle: 'italic'
-                        }}>
-                          <strong>Práticas:</strong> {virtues.find(v => v.name === selectedVirtue)?.practices}
+                          {virtues.find(v => v.name === selectedVirtue)?.shortDesc}
                         </p>
                       </div>
                     )}
@@ -984,7 +1445,7 @@ function App() {
                       color: isDark ? '#1a1a2e' : 'white',
                       border: 'none',
                       borderRadius: '8px',
-                      fontSize: '1.1rem',
+                      fontSize: 'clamp(1rem, 2vw, 1.1rem)',
                       fontWeight: 'bold',
                       cursor: 'pointer',
                       fontFamily: 'Georgia, serif',
@@ -1001,7 +1462,7 @@ function App() {
               )}
             </div>
 
-            {/* EPÍLOGO */}
+            {/* EPÍLOGO com opção "Não fiz o Prólogo" */}
             <div style={{
               background: isDark ? 'rgba(26, 26, 46, 0.6)' : 'white',
               padding: '2rem',
@@ -1013,7 +1474,7 @@ function App() {
                 <Sunset size={28} color={isDark ? '#b19cd9' : '#9c27b0'} />
                 <h2 style={{
                   margin: 0,
-                  fontSize: '1.8rem',
+                  fontSize: 'clamp(1.3rem, 3vw, 1.8rem)',
                   color: isDark ? '#f0e6d2' : '#2c1810'
                 }}>
                   Epílogo Noturno
@@ -1039,6 +1500,39 @@ function App() {
                 </div>
               ) : (
                 <div>
+                  {/* NOVO: Checkbox "Não fiz o Prólogo" */}
+                  {!morningDone && (
+                    <div style={{
+                      padding: '1rem',
+                      background: isDark ? 'rgba(255, 152, 0, 0.1)' : 'rgba(255, 152, 0, 0.1)',
+                      borderRadius: '8px',
+                      marginBottom: '1.5rem',
+                      border: `2px solid ${isDark ? 'rgba(255, 152, 0, 0.3)' : 'rgba(255, 152, 0, 0.3)'}`
+                    }}>
+                      <label style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.75rem',
+                        cursor: 'pointer',
+                        color: isDark ? '#ffb74d' : '#e65100'
+                      }}>
+                        <input
+                          type="checkbox"
+                          checked={!didMorning}
+                          onChange={(e) => setDidMorning(!e.target.checked)}
+                          style={{
+                            width: '20px',
+                            height: '20px',
+                            cursor: 'pointer'
+                          }}
+                        />
+                        <span style={{ fontWeight: 600 }}>
+                          Não fiz o Prólogo hoje
+                        </span>
+                      </label>
+                    </div>
+                  )}
+
                   <p style={{
                     marginBottom: '1.5rem',
                     color: isDark ? '#b8a88a' : '#6b5744',
@@ -1140,7 +1634,7 @@ function App() {
                       color: 'white',
                       border: 'none',
                       borderRadius: '8px',
-                      fontSize: '1.1rem',
+                      fontSize: 'clamp(1rem, 2vw, 1.1rem)',
                       fontWeight: 'bold',
                       cursor: 'pointer',
                       fontFamily: 'Georgia, serif',
@@ -1159,80 +1653,677 @@ function App() {
           </div>
         )}
 
-        {/* VIEW: HISTORY */}
-        {view === 'history' && (
-          <div>
+        {/* Continua na próxima mensagem... */}
+        {/* VIEW: TASKS - Tarefas Personalizadas */}
+        {view === 'tasks' && (
+          <div className="animate-fadeIn">
             <div style={{
+              background: isDark ? 'rgba(26, 26, 46, 0.6)' : 'white',
+              padding: '2rem',
+              borderRadius: '16px',
+              border: `2px solid ${isDark ? 'rgba(212, 175, 55, 0.3)' : 'rgba(139, 115, 85, 0.2)'}`,
+              boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
+                <h2 style={{
+                  margin: 0,
+                  fontSize: 'clamp(1.3rem, 3vw, 1.8rem)',
+                  color: isDark ? '#f0e6d2' : '#2c1810',
+                  fontFamily: "'Cinzel', serif"
+                }}>
+                  Tarefas Personalizadas
+                </h2>
+                <button
+                  onClick={() => setShowAddTask(true)}
+                  style={{
+                    padding: '0.75rem 1.5rem',
+                    background: isDark ? '#d4af37' : '#8b7355',
+                    color: isDark ? '#1a1a2e' : 'white',
+                    border: 'none',
+                    borderRadius: '8px',
+                    cursor: 'pointer',
+                    fontFamily: 'Georgia, serif',
+                    fontWeight: 600,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem'
+                  }}
+                >
+                  <Plus size={18} />
+                  Nova Tarefa
+                </button>
+              </div>
+
+              <p style={{
+                color: isDark ? '#b8a88a' : '#6b5744',
+                marginBottom: '2rem',
+                fontSize: '1rem'
+              }}>
+                Cadastre práticas que deseja acompanhar diariamente (ex: Tratak, Meditação, Leitura, Exercícios)
+              </p>
+
+              {showAddTask && (
+                <div style={{
+                  padding: '1.5rem',
+                  background: isDark ? 'rgba(212, 175, 55, 0.1)' : 'rgba(255, 245, 220, 0.5)',
+                  borderRadius: '12px',
+                  marginBottom: '2rem',
+                  border: `2px solid ${isDark ? 'rgba(212, 175, 55, 0.3)' : 'rgba(139, 115, 85, 0.3)'}`
+                }}>
+                  <div style={{ display: 'flex', gap: '1rem', marginBottom: '1rem' }}>
+                    <input
+                      type="text"
+                      value={newTaskName}
+                      onChange={(e) => setNewTaskName(e.target.value)}
+                      placeholder="Nome da tarefa (ex: Fazer Tratak)"
+                      style={{
+                        flex: 1,
+                        padding: '0.75rem',
+                        border: `2px solid ${isDark ? 'rgba(212, 175, 55, 0.5)' : '#8b7355'}`,
+                        borderRadius: '8px',
+                        fontSize: '1rem',
+                        fontFamily: 'Georgia, serif',
+                        background: isDark ? 'rgba(26, 26, 46, 0.8)' : 'white',
+                        color: isDark ? '#f0e6d2' : '#2c1810'
+                      }}
+                      onKeyPress={(e) => e.key === 'Enter' && addCustomTask()}
+                    />
+                    <button
+                      onClick={addCustomTask}
+                      style={{
+                        padding: '0.75rem 1.5rem',
+                        background: isDark ? '#d4af37' : '#8b7355',
+                        color: isDark ? '#1a1a2e' : 'white',
+                        border: 'none',
+                        borderRadius: '8px',
+                        cursor: 'pointer',
+                        fontFamily: 'Georgia, serif',
+                        fontWeight: 600
+                      }}
+                    >
+                      Adicionar
+                    </button>
+                    <button
+                      onClick={() => {
+                        setShowAddTask(false);
+                        setNewTaskName('');
+                      }}
+                      style={{
+                        padding: '0.75rem',
+                        background: 'transparent',
+                        color: isDark ? '#d4af37' : '#8b7355',
+                        border: `2px solid ${isDark ? '#d4af37' : '#8b7355'}`,
+                        borderRadius: '8px',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      <X size={20} />
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {customTasks.length === 0 ? (
+                <div style={{
+                  textAlign: 'center',
+                  padding: '3rem',
+                  color: isDark ? '#b8a88a' : '#6b5744'
+                }}>
+                  <CheckCircle size={48} style={{ margin: '0 auto 1rem', opacity: 0.5 }} />
+                  <p style={{ fontSize: '1.1rem' }}>
+                    Nenhuma tarefa cadastrada ainda
+                  </p>
+                  <p style={{ fontSize: '0.95rem', opacity: 0.8 }}>
+                    Clique em "Nova Tarefa" para começar
+                  </p>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                  {customTasks.map(task => (
+                    <div
+                      key={task.id}
+                      style={{
+                        padding: '1rem',
+                        background: isDark ? 'rgba(26, 26, 46, 0.4)' : 'rgba(255, 255, 255, 0.8)',
+                        border: `2px solid ${isDark ? 'rgba(212, 175, 55, 0.3)' : 'rgba(139, 115, 85, 0.2)'}`,
+                        borderRadius: '8px',
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center'
+                      }}
+                    >
+                      <span style={{
+                        fontSize: '1.05rem',
+                        color: isDark ? '#f0e6d2' : '#2c1810'
+                      }}>
+                        {task.name}
+                      </span>
+                      <button
+                        onClick={() => removeCustomTask(task.id)}
+                        style={{
+                          padding: '0.5rem',
+                          background: 'transparent',
+                          color: '#e74c3c',
+                          border: '2px solid #e74c3c',
+                          borderRadius: '6px',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center'
+                        }}
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* VIEW: GOALS - Metas de Longo Prazo */}
+        {view === 'goals' && (
+          <div className="animate-fadeIn">
+            <div style={{
+              background: isDark ? 'rgba(26, 26, 46, 0.6)' : 'white',
+              padding: '2rem',
+              borderRadius: '16px',
+              border: `2px solid ${isDark ? 'rgba(212, 175, 55, 0.3)' : 'rgba(139, 115, 85, 0.2)'}`,
+              boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '2rem' }}>
+                <Target size={32} color={isDark ? '#d4af37' : '#8b7355'} />
+                <h2 style={{
+                  margin: 0,
+                  fontSize: 'clamp(1.3rem, 3vw, 1.8rem)',
+                  color: isDark ? '#f0e6d2' : '#2c1810',
+                  fontFamily: "'Cinzel', serif"
+                }}>
+                  Metas de Longo Prazo
+                </h2>
+              </div>
+
+              <p style={{
+                color: isDark ? '#b8a88a' : '#6b5744',
+                marginBottom: '2rem',
+                fontSize: '1rem',
+                fontStyle: 'italic'
+              }}>
+                "Amanhã" - Descreva como você deseja ser no futuro
+              </p>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+                {/* Metas do Ano */}
+                <div>
+                  <label style={{
+                    display: 'block',
+                    marginBottom: '0.75rem',
+                    fontWeight: 600,
+                    fontSize: '1.1rem',
+                    color: isDark ? '#d4af37' : '#8b7355',
+                    fontFamily: "'Cinzel', serif"
+                  }}>
+                    Metas para Este Ano
+                  </label>
+                  <textarea
+                    value={yearGoals}
+                    onChange={(e) => setYearGoals(e.target.value)}
+                    placeholder="Como você quer estar no final deste ano? Que virtudes quer ter desenvolvido? Que objetivos quer alcançar?"
+                    rows={6}
+                    style={{
+                      width: '100%',
+                      padding: '1rem',
+                      border: `2px solid ${isDark ? 'rgba(212, 175, 55, 0.5)' : '#8b7355'}`,
+                      borderRadius: '8px',
+                      fontSize: '1rem',
+                      fontFamily: 'Georgia, serif',
+                      background: isDark ? 'rgba(26, 26, 46, 0.8)' : 'white',
+                      color: isDark ? '#f0e6d2' : '#2c1810',
+                      resize: 'vertical',
+                      lineHeight: '1.7'
+                    }}
+                  />
+                </div>
+
+                {/* Metas da Vida */}
+                <div>
+                  <label style={{
+                    display: 'block',
+                    marginBottom: '0.75rem',
+                    fontWeight: 600,
+                    fontSize: '1.1rem',
+                    color: isDark ? '#d4af37' : '#8b7355',
+                    fontFamily: "'Cinzel', serif"
+                  }}>
+                    Visão de Longo Prazo (Vida)
+                  </label>
+                  <textarea
+                    value={lifeGoals}
+                    onChange={(e) => setLifeGoals(e.target.value)}
+                    placeholder="Qual é sua visão maior? Que tipo de pessoa você quer ser? Que legado quer deixar?"
+                    rows={8}
+                    style={{
+                      width: '100%',
+                      padding: '1rem',
+                      border: `2px solid ${isDark ? 'rgba(212, 175, 55, 0.5)' : '#8b7355'}`,
+                      borderRadius: '8px',
+                      fontSize: '1rem',
+                      fontFamily: 'Georgia, serif',
+                      background: isDark ? 'rgba(26, 26, 46, 0.8)' : 'white',
+                      color: isDark ? '#f0e6d2' : '#2c1810',
+                      resize: 'vertical',
+                      lineHeight: '1.7'
+                    }}
+                  />
+                </div>
+
+                <button
+                  onClick={saveLongTermGoals}
+                  style={{
+                    padding: '1rem 2rem',
+                    background: isDark ? '#d4af37' : '#8b7355',
+                    color: isDark ? '#1a1a2e' : 'white',
+                    border: 'none',
+                    borderRadius: '8px',
+                    fontSize: '1.1rem',
+                    fontWeight: 'bold',
+                    cursor: 'pointer',
+                    fontFamily: 'Georgia, serif',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '0.5rem',
+                    alignSelf: 'flex-end'
+                  }}
+                >
+                  <Save size={20} />
+                  Salvar Metas
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* VIEW: BIBLIOTECA - Biblioteca de Virtudes */}
+        {view === 'biblioteca' && (
+          <div className="animate-fadeIn">
+            <div style={{
+              background: isDark ? 'rgba(26, 26, 46, 0.6)' : 'white',
+              padding: '2rem',
+              borderRadius: '16px',
+              border: `2px solid ${isDark ? 'rgba(212, 175, 55, 0.3)' : 'rgba(139, 115, 85, 0.2)'}`,
+              boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '2rem' }}>
+                <Book size={32} color={isDark ? '#d4af37' : '#8b7355'} />
+                <h2 style={{
+                  margin: 0,
+                  fontSize: 'clamp(1.3rem, 3vw, 1.8rem)',
+                  color: isDark ? '#f0e6d2' : '#2c1810',
+                  fontFamily: "'Cinzel', serif"
+                }}>
+                  Biblioteca de Virtudes
+                </h2>
+              </div>
+
+              <p style={{
+                color: isDark ? '#b8a88a' : '#6b5744',
+                marginBottom: '2rem',
+                fontSize: '1rem'
+              }}>
+                Conheça as virtudes que estamos estudando e suas práticas
+              </p>
+
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+                gap: '1.5rem'
+              }}>
+                {virtues.map((virtue, index) => (
+                  <div
+                    key={index}
+                    onClick={() => setSelectedVirtueDetail(selectedVirtueDetail === virtue.name ? null : virtue.name)}
+                    style={{
+                      padding: '1.5rem',
+                      background: selectedVirtueDetail === virtue.name
+                        ? (isDark ? `${virtue.color}20` : `${virtue.color}15`)
+                        : (isDark ? 'rgba(26, 26, 46, 0.4)' : 'rgba(255, 255, 255, 0.8)'),
+                      border: `2px solid ${selectedVirtueDetail === virtue.name ? virtue.color : (isDark ? 'rgba(212, 175, 55, 0.3)' : 'rgba(139, 115, 85, 0.2)')}`,
+                      borderRadius: '12px',
+                      cursor: 'pointer',
+                      transition: 'all 0.3s ease'
+                    }}
+                  >
+                    <h3 style={{
+                      margin: '0 0 0.75rem 0',
+                      fontSize: '1.3rem',
+                      color: virtue.color,
+                      fontFamily: "'Cinzel', serif"
+                    }}>
+                      {virtue.name}
+                    </h3>
+
+                    <p style={{
+                      fontSize: '0.95rem',
+                      color: isDark ? '#c8b896' : '#6b5744',
+                      margin: '0 0 1rem 0',
+                      fontStyle: 'italic'
+                    }}>
+                      {virtue.shortDesc}
+                    </p>
+
+                    {selectedVirtueDetail === virtue.name && (
+                      <div style={{
+                        marginTop: '1rem',
+                        paddingTop: '1rem',
+                        borderTop: `1px solid ${isDark ? 'rgba(212, 175, 55, 0.2)' : 'rgba(139, 115, 85, 0.2)'}`
+                      }}>
+                        <p style={{
+                          fontSize: '1rem',
+                          color: isDark ? '#f0e6d2' : '#2c1810',
+                          marginBottom: '1rem',
+                          lineHeight: '1.7'
+                        }}>
+                          {virtue.description}
+                        </p>
+
+                        <div style={{
+                          padding: '1rem',
+                          background: isDark ? 'rgba(26, 26, 46, 0.6)' : 'rgba(255, 255, 255, 0.5)',
+                          borderRadius: '8px'
+                        }}>
+                          <h4 style={{
+                            margin: '0 0 0.75rem 0',
+                            fontSize: '0.9rem',
+                            color: virtue.color,
+                            fontWeight: 600,
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.5px'
+                          }}>
+                            Práticas Sugeridas:
+                          </h4>
+                          <p style={{
+                            fontSize: '0.95rem',
+                            color: isDark ? '#c8b896' : '#6b5744',
+                            margin: 0,
+                            lineHeight: '1.8',
+                            whiteSpace: 'pre-line'
+                          }}>
+                            {virtue.practices}
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* VIEW: FV - Seção Oculta */}
+        {view === 'fv' && fvUnlocked && (
+          <div className="animate-fadeIn">
+            <div style={{
+              background: 'linear-gradient(135deg, rgba(255, 215, 0, 0.1) 0%, rgba(255, 165, 0, 0.1) 100%)',
+              padding: '2rem',
+              borderRadius: '16px',
+              border: '2px solid #FFD700',
+              boxShadow: '0 0 20px rgba(255, 215, 0, 0.3)'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '2rem' }}>
+                <Award size={32} color="#FFD700" />
+                <h2 style={{
+                  margin: 0,
+                  fontSize: 'clamp(1.3rem, 3vw, 1.8rem)',
+                  color: '#FFD700',
+                  fontFamily: "'Cinzel', serif"
+                }}>
+                  Seção FV
+                </h2>
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+                {/* Carta de Degrau */}
+                <div>
+                  <label style={{
+                    display: 'block',
+                    marginBottom: '0.75rem',
+                    fontWeight: 600,
+                    fontSize: '1.1rem',
+                    color: '#FFD700',
+                    fontFamily: "'Cinzel', serif"
+                  }}>
+                    Carta de Degrau
+                  </label>
+                  <textarea
+                    value={fvCartaDegrau}
+                    onChange={(e) => setFvCartaDegrau(e.target.value)}
+                    placeholder="Cole aqui o conteúdo da sua carta de degrau..."
+                    rows={8}
+                    style={{
+                      width: '100%',
+                      padding: '1rem',
+                      border: '2px solid rgba(255, 215, 0, 0.5)',
+                      borderRadius: '8px',
+                      fontSize: '1rem',
+                      fontFamily: 'Georgia, serif',
+                      background: isDark ? 'rgba(26, 26, 46, 0.8)' : 'white',
+                      color: isDark ? '#f0e6d2' : '#2c1810',
+                      resize: 'vertical',
+                      lineHeight: '1.7'
+                    }}
+                  />
+                </div>
+
+                {/* Datas da Carta */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '1rem' }}>
+                  <div>
+                    <label style={{
+                      display: 'block',
+                      marginBottom: '0.5rem',
+                      fontWeight: 600,
+                      color: '#FFD700'
+                    }}>
+                      Última Entrega
+                    </label>
+                    <input
+                      type="date"
+                      value={fvLastCartaDate || ''}
+                      onChange={(e) => setFvLastCartaDate(e.target.value)}
+                      style={{
+                        width: '100%',
+                        padding: '0.75rem',
+                        border: '2px solid rgba(255, 215, 0, 0.5)',
+                        borderRadius: '8px',
+                        fontSize: '1rem',
+                        fontFamily: 'Georgia, serif',
+                        background: isDark ? 'rgba(26, 26, 46, 0.8)' : 'white',
+                        color: isDark ? '#f0e6d2' : '#2c1810'
+                      }}
+                    />
+                  </div>
+
+                  <div>
+                    <label style={{
+                      display: 'block',
+                      marginBottom: '0.5rem',
+                      fontWeight: 600,
+                      color: '#FFD700'
+                    }}>
+                      Próxima Entrega Prevista
+                    </label>
+                    <input
+                      type="date"
+                      value={fvNextCartaDate || ''}
+                      onChange={(e) => setFvNextCartaDate(e.target.value)}
+                      style={{
+                        width: '100%',
+                        padding: '0.75rem',
+                        border: '2px solid rgba(255, 215, 0, 0.5)',
+                        borderRadius: '8px',
+                        fontSize: '1rem',
+                        fontFamily: 'Georgia, serif',
+                        background: isDark ? 'rgba(26, 26, 46, 0.8)' : 'white',
+                        color: isDark ? '#f0e6d2' : '#2c1810'
+                      }}
+                    />
+                  </div>
+                </div>
+
+                {/* GDVE */}
+                <div>
+                  <label style={{
+                    display: 'block',
+                    marginBottom: '0.75rem',
+                    fontWeight: 600,
+                    fontSize: '1.1rem',
+                    color: '#FFD700',
+                    fontFamily: "'Cinzel', serif"
+                  }}>
+                    Próxima Reunião GDVE
+                  </label>
+                  <input
+                    type="datetime-local"
+                    value={fvGdveReuniao || ''}
+                    onChange={(e) => setFvGdveReuniao(e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '0.75rem',
+                      border: '2px solid rgba(255, 215, 0, 0.5)',
+                      borderRadius: '8px',
+                      fontSize: '1rem',
+                      fontFamily: 'Georgia, serif',
+                      background: isDark ? 'rgba(26, 26, 46, 0.8)' : 'white',
+                      color: isDark ? '#f0e6d2' : '#2c1810'
+                    }}
+                  />
+                </div>
+
+                <button
+                  onClick={saveFVData}
+                  style={{
+                    padding: '1rem 2rem',
+                    background: 'linear-gradient(135deg, #FFD700 0%, #FFA500 100%)',
+                    color: '#000',
+                    border: 'none',
+                    borderRadius: '8px',
+                    fontSize: '1.1rem',
+                    fontWeight: 'bold',
+                    cursor: 'pointer',
+                    fontFamily: 'Georgia, serif',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '0.5rem',
+                    alignSelf: 'flex-end',
+                    boxShadow: '0 4px 12px rgba(255, 215, 0, 0.3)'
+                  }}
+                >
+                  <Save size={20} />
+                  Salvar Dados FV
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* VIEW: HISTORY (mantém o código anterior) */}
+        {view === 'history' && (
+          <div className="animate-fadeIn">
+            <div style={{
+              marginBottom: '2rem',
               display: 'flex',
               justifyContent: 'space-between',
               alignItems: 'center',
-              marginBottom: '2rem',
               flexWrap: 'wrap',
               gap: '1rem'
             }}>
               <h2 style={{
-                margin: 0,
-                fontSize: '1.8rem',
-                color: isDark ? '#f0e6d2' : '#2c1810'
+                fontFamily: "'Cinzel', serif",
+                fontSize: '1.5rem',
+                color: isDark ? '#d4af37' : '#8b7355',
+                margin: 0
               }}>
                 Histórico de Reflexões
               </h2>
 
-              <button
-                onClick={exportToCSV}
-                disabled={entries.length === 0}
-                style={{
+              <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
+                <button
+                  onClick={exportToCSV}
+                  disabled={entries.length === 0}
+                  style={{
+                    padding: '0.75rem 1.5rem',
+                    background: entries.length > 0 ? (isDark ? '#d4af37' : '#8b7355') : '#ccc',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '8px',
+                    cursor: entries.length > 0 ? 'pointer' : 'not-allowed',
+                    fontFamily: 'Georgia, serif',
+                    fontWeight: 600,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem'
+                  }}
+                >
+                  <Download size={18} />
+                  Exportar CSV
+                </button>
+
+                <label style={{
                   padding: '0.75rem 1.5rem',
-                  background: entries.length > 0 ? (isDark ? '#d4af37' : '#8b7355') : '#ccc',
-                  color: 'white',
+                  background: isDark ? '#d4af37' : '#8b7355',
+                  color: isDark ? '#1a1a2e' : 'white',
                   border: 'none',
                   borderRadius: '8px',
-                  cursor: entries.length > 0 ? 'pointer' : 'not-allowed',
+                  cursor: 'pointer',
                   fontFamily: 'Georgia, serif',
                   fontWeight: 600,
                   display: 'flex',
                   alignItems: 'center',
                   gap: '0.5rem'
-                }}
-              >
-                <Download size={18} />
-                Exportar CSV
-              </button>
-            </div>
-
-            {/* Busca */}
-            <div style={{ marginBottom: '2rem' }}>
-              <div style={{ position: 'relative' }}>
-                <Search 
-                  size={20} 
-                  color={isDark ? '#d4af37' : '#8b7355'}
-                  style={{
-                    position: 'absolute',
-                    left: '1rem',
-                    top: '50%',
-                    transform: 'translateY(-50%)'
-                  }}
-                />
-                <input
-                  type="text"
-                  placeholder="Buscar nas reflexões..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  style={{
-                    width: '100%',
-                    padding: '0.75rem 0.75rem 0.75rem 3rem',
-                    border: `2px solid ${isDark ? 'rgba(212, 175, 55, 0.5)' : '#8b7355'}`,
-                    borderRadius: '8px',
-                    fontSize: '1rem',
-                    fontFamily: 'Georgia, serif',
-                    background: isDark ? 'rgba(26, 26, 46, 0.8)' : 'white',
-                    color: isDark ? '#f0e6d2' : '#2c1810'
-                  }}
-                />
+                }}>
+                  <Upload size={18} />
+                  Importar
+                  <input
+                    type="file"
+                    accept=".csv,.json,.txt"
+                    onChange={importDiary}
+                    style={{ display: 'none' }}
+                  />
+                </label>
               </div>
             </div>
 
-            {/* Lista de Entradas */}
+            <div style={{ position: 'relative', marginBottom: '2rem' }}>
+              <Search
+                size={20}
+                color={isDark ? '#d4af37' : '#8b7355'}
+                style={{
+                  position: 'absolute',
+                  left: '1rem',
+                  top: '50%',
+                  transform: 'translateY(-50%)'
+                }}
+              />
+              <input
+                type="text"
+                placeholder="Buscar nas reflexões..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '0.75rem 0.75rem 0.75rem 3rem',
+                  border: `2px solid ${isDark ? 'rgba(212, 175, 55, 0.5)' : '#8b7355'}`,
+                  borderRadius: '8px',
+                  fontSize: '1rem',
+                  fontFamily: 'Georgia, serif',
+                  background: isDark ? 'rgba(26, 26, 46, 0.8)' : 'white',
+                  color: isDark ? '#f0e6d2' : '#2c1810'
+                }}
+              />
+            </div>
+
             {filteredEntries.length === 0 ? (
               <div style={{
                 padding: '3rem',
@@ -1263,9 +2354,7 @@ function App() {
                       display: 'flex',
                       justifyContent: 'space-between',
                       alignItems: 'center',
-                      marginBottom: '1rem',
-                      flexWrap: 'wrap',
-                      gap: '0.5rem'
+                      marginBottom: '1rem'
                     }}>
                       <div>
                         <h3 style={{
@@ -1289,6 +2378,16 @@ function App() {
                             Virtude: <strong>{entry.virtue}</strong>
                           </p>
                         )}
+                        {!entry.didMorning && (
+                          <p style={{
+                            margin: '0.25rem 0 0 0',
+                            color: '#ff9800',
+                            fontSize: '0.85rem',
+                            fontStyle: 'italic'
+                          }}>
+                            ⚠️ Prólogo não realizado
+                          </p>
+                        )}
                       </div>
 
                       <button
@@ -1299,10 +2398,7 @@ function App() {
                           color: '#e74c3c',
                           border: '2px solid #e74c3c',
                           borderRadius: '8px',
-                          cursor: 'pointer',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '0.5rem'
+                          cursor: 'pointer'
                         }}
                       >
                         <X size={16} />
@@ -1398,7 +2494,7 @@ function App() {
           "Que ninguém durma sem antes examinar as ações do dia"
         </p>
         <p style={{ margin: '0.5rem 0 0 0', fontSize: '0.85rem', opacity: 0.8 }}>
-          Nova Acrópole · Filosofia à Maneira Clássica
+          Nova Acrópole · Filosofia à Maneira Clássica · Versos de Ouro de Pitágoras
         </p>
       </footer>
     </div>
