@@ -3435,6 +3435,9 @@ function App() {
           <button onClick={() => setView('home')} style={{ padding: '0.6rem 1.5rem', background: isDark ? '#d4af37' : '#8b7355', color: isDark ? '#1a1a2e' : 'white', border: 'none', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer', transition: 'transform 0.2s' }}>
             Voltar ao Início
           </button>
+          <button onClick={() => setView('notifications')} style={{ background: 'transparent', border: 'none', color: view === 'notifications' ? '#d4af37' : (isDark ? '#f0e6d2' : '#2c1810'), cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <Bell size={20} /> Guardião
+          </button>
         </div>
             </div>
             {dailyQuote && (
