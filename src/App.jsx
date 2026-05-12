@@ -3260,6 +3260,9 @@ function App() {
                       <button onClick={() => { setView('goals'); setShowPracticesMenu(false); }} style={{ padding: '0.75rem 1rem', background: view === 'goals' ? (isDark ? 'rgba(212,175,55,0.15)' : 'rgba(139,115,85,0.1)') : 'transparent', border: 'none', color: isDark ? '#f0e6d2' : '#2c1810', textAlign: 'left', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.9rem', fontFamily: 'Georgia, serif' }} onMouseOver={(e) => e.currentTarget.style.background = isDark ? 'rgba(212, 175, 55, 0.1)' : 'rgba(139, 115, 85, 0.05)'} onMouseOut={(e) => e.currentTarget.style.background = view === 'goals' ? (isDark ? 'rgba(212,175,55,0.15)' : 'rgba(139,115,85,0.1)') : 'transparent'}>🎯 Metas</button>
                       <button onClick={() => { setView('leituras'); setShowPracticesMenu(false); }} style={{ padding: '0.75rem 1rem', background: view === 'leituras' ? (isDark ? 'rgba(212,175,55,0.15)' : 'rgba(139,115,85,0.1)') : 'transparent', border: 'none', color: isDark ? '#f0e6d2' : '#2c1810', textAlign: 'left', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.9rem', fontFamily: 'Georgia, serif' }} onMouseOver={(e) => e.currentTarget.style.background = isDark ? 'rgba(212, 175, 55, 0.1)' : 'rgba(139, 115, 85, 0.05)'} onMouseOut={(e) => e.currentTarget.style.background = view === 'leituras' ? (isDark ? 'rgba(212,175,55,0.15)' : 'rgba(139,115,85,0.1)') : 'transparent'}><Library size={16}/> Leituras</button>
                       <button onClick={() => { setView('biblioteca'); setShowPracticesMenu(false); }} style={{ padding: '0.75rem 1rem', background: view === 'biblioteca' ? (isDark ? 'rgba(212,175,55,0.15)' : 'rgba(139,115,85,0.1)') : 'transparent', border: 'none', color: isDark ? '#f0e6d2' : '#2c1810', textAlign: 'left', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.9rem', fontFamily: 'Georgia, serif' }} onMouseOver={(e) => e.currentTarget.style.background = isDark ? 'rgba(212, 175, 55, 0.1)' : 'rgba(139, 115, 85, 0.05)'} onMouseOut={(e) => e.currentTarget.style.background = view === 'biblioteca' ? (isDark ? 'rgba(212,175,55,0.15)' : 'rgba(139,115,85,0.1)') : 'transparent'}>🏛️ Virtudes</button>
+                      <button onClick={() => setView('notifications')} style={{ background: 'transparent', border: 'none', color: view === 'notifications' ? (isDark ? '#d4af37' : '#8b7355') : (isDark ? '#f0e6d2' : '#2c1810'), cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: view === 'notifications' ? 'bold' : 'normal' }}>
+                      <Bell size={20} /> Guardião
+                      </button>
                     </div>
                   </div>
                 )}
@@ -3431,9 +3434,6 @@ function App() {
 
           <button onClick={() => setView('home')} style={{ padding: '0.6rem 1.5rem', background: isDark ? '#d4af37' : '#8b7355', color: isDark ? '#1a1a2e' : 'white', border: 'none', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer', transition: 'transform 0.2s' }}>
             Voltar ao Início
-          </button>
-          <button onClick={() => setView('notifications')} style={{ background: 'transparent', border: 'none', color: view === 'notifications' ? '#d4af37' : (isDark ? '#f0e6d2' : '#2c1810'), cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <Bell size={20} /> Guardião
           </button>
         </div>
             </div>
@@ -4719,7 +4719,7 @@ function App() {
           </div>
         )}
 
-        {/* MODAL DE CONVITE PÓS-LEITURA (REQ 6) */}
+              {/* MODAL DE CONVITE PÓS-LEITURA (REQ 6) */}
               {postReadInvite && (
                 <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.85)', zIndex: 10001, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem', backdropFilter: 'blur(5px)' }}>
                   <div className="animate-fadeIn" style={{ background: isDark ? '#1a1a2e' : '#fdfbf7', padding: '2rem', borderRadius: '16px', maxWidth: '450px', width: '100%', border: `2px solid ${isDark ? '#FFD700' : '#996515'}`, textAlign: 'center', boxShadow: '0 10px 40px rgba(0,0,0,0.5)' }}>
