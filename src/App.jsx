@@ -6,7 +6,8 @@ import {
   Target, TrendingUp, Award, FileText, Book, Settings,
   Trash2, Edit, Save, XCircle, Flame, Zap, Shield, Star, Crown, 
   Bell, Check, Music, MessageSquare, Menu, Lock, ChevronDown, ChevronUp, 
-  Mountain, Landmark, Swords, Bookmark, Library, MessageCircle, Camera
+  Mountain, Landmark, Swords, Bookmark, Library, MessageCircle, Camera,
+  ChevronLeft, Smartphone, Clock, ShieldAlert, ArrowLeft
 } from 'lucide-react';
 
 import { auth, db, messaging } from './config/firebase-config'; 
@@ -63,6 +64,35 @@ function App() {
   const [fvAccessStatus, setFvAccessStatus] = useState('checking'); // 'checking', 'approved', 'pending', 'unregistered'
   const [requestName, setRequestName] = useState('');
   const [requestUnit, setRequestUnit] = useState('');
+
+  //--- Estado da Central de Notificação
+  const [notifSettings, setNotifSettings] = useState({
+    whatsappNumber: '',
+    notifMorningTime: '07:30',
+    notifNightTime: '21:00',
+    alerts: {
+      dailyVirtue: true,
+      dailyEpilogue: true,
+      pendingTasks: true,
+      readingSlump: true,
+      practiceSlump: true,
+      diarySlump: true,
+      gdveWarning: true,
+      randomVirtue: false
+    }
+  });
+
+  const saveNotificationSettings = async () => {
+    if (!user) return;
+    try {
+      // Salva em um documento específico de configurações do usuário
+      await setDoc(doc(db, 'userSettings', user.uid), { notifications: notifSettings }, { merge: true });
+      alert("✅ Configurações do Guardião salvas com sucesso!");
+    } catch (e) {
+      console.error("Erro ao salvar notificações:", e);
+      alert("Erro ao salvar as configurações.");
+    }
+  };
 
   const toggleNotifications = async () => {
     if (notificationsActive) {
@@ -3362,21 +3392,50 @@ function App() {
                 </span>
               </div>
               
-              <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-                <input 
-                  type="date" 
-                  value={selectedDate} 
-                  onChange={(e) => handleDateChange(e.target.value)}
-                  max={getTodayKey()} 
-                  style={{ padding: '0.6rem', borderRadius: '8px', border: `1px solid ${isDark ? '#d4af37' : '#ccc'}`, background: isDark ? 'rgba(26, 26, 46, 0.8)' : 'white', color: isDark ? '#f0e6d2' : '#2c1810', fontSize: '1rem', fontFamily: 'Georgia, serif', cursor: 'pointer' }} 
-                />
-                
-                {selectedDate !== getTodayKey() && (
-                  <button onClick={() => handleDateChange(getTodayKey())} style={{ padding: '0.6rem 1rem', background: isDark ? '#d4af37' : '#6b4423', color: isDark ? '#1a1a2e' : 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', transition: 'all 0.2s', boxShadow: '0 2px 8px rgba(0,0,0,0.2)' }}>
-                    Voltar para Hoje
-                  </button>
-                )}
-              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', alignItems: 'center', background: isDark ? 'rgba(0,0,0,0.3)' : 'white', border: `1px solid ${isDark ? '#444' : '#ccc'}`, borderRadius: '8px', padding: '0.2rem' }}>
+            <button 
+              onClick={() => {
+                const d = new Date(currentDate + 'T12:00:00');
+                d.setDate(d.getDate() - 1);
+                setCurrentDate(d.toISOString().split('T')[0]);
+              }}
+              style={{ background: 'transparent', border: 'none', color: isDark ? '#d4af37' : '#2c1810', cursor: 'pointer', padding: '0.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+              title="Dia Anterior"
+            >
+              <ChevronLeft size={20} />
+            </button>
+
+            <input 
+              type="date" 
+              value={currentDate} 
+              onChange={(e) => setCurrentDate(e.target.value)} 
+              max={new Date().toLocaleDateString('en-CA')} // Impede selecionar dias no futuro
+              style={{ background: 'transparent', color: isDark ? '#f0e6d2' : '#2c1810', border: 'none', padding: '0.5rem', fontSize: '1rem', fontFamily: 'Georgia, serif', outline: 'none', cursor: 'pointer' }}
+            />
+
+            <button 
+              onClick={() => {
+                const todayStr = new Date().toLocaleDateString('en-CA');
+                if (currentDate >= todayStr) return; // Não avança se já for hoje
+                const d = new Date(currentDate + 'T12:00:00');
+                d.setDate(d.getDate() + 1);
+                setCurrentDate(d.toISOString().split('T')[0]);
+              }}
+              style={{ background: 'transparent', border: 'none', color: currentDate >= new Date().toLocaleDateString('en-CA') ? (isDark ? '#555' : '#ccc') : (isDark ? '#d4af37' : '#2c1810'), cursor: currentDate >= new Date().toLocaleDateString('en-CA') ? 'not-allowed' : 'pointer', padding: '0.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+              title="Próximo Dia"
+            >
+              <ChevronRight size={20} />
+            </button>
+          </div>
+
+          <button onClick={() => setView('home')} style={{ padding: '0.6rem 1.5rem', background: isDark ? '#d4af37' : '#8b7355', color: isDark ? '#1a1a2e' : 'white', border: 'none', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer', transition: 'transform 0.2s' }}>
+            Voltar ao Início
+          </button>
+          <button onClick={() => setView('notifications')} style={{ background: 'transparent', border: 'none', color: view === 'notifications' ? '#d4af37' : (isDark ? '#f0e6d2' : '#2c1810'), cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <Bell size={20} /> Guardião
+          </button>
+        </div>
             </div>
             {dailyQuote && (
               <div style={{ padding: '2rem', background: isDark ? 'rgba(212, 175, 55, 0.1)' : 'rgba(255, 245, 220, 0.6)', borderRadius: '16px', border: `2px solid ${isDark ? 'rgba(212, 175, 55, 0.3)' : 'rgba(139, 115, 85, 0.3)'}`, marginBottom: '2rem' }}>
@@ -4562,6 +4621,101 @@ function App() {
                 </div>
               )}
             </div>
+          </div>
+        )}
+
+        {/* VIEW: CENTRAL DE NOTIFICAÇÕES (O GUARDIÃO) */}
+        {view === 'notifications' && (
+          <div className="animate-fadeIn" style={{ maxWidth: '800px', margin: '0 auto', paddingBottom: '2rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '2rem' }}>
+              <button onClick={() => setView('home')} style={{ background: 'transparent', border: 'none', color: isDark ? '#d4af37' : '#8b7355', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
+                <ArrowLeft size={24} />
+              </button>
+              <Bell size={28} color={isDark ? '#d4af37' : '#8b7355'} />
+              <h2 style={{ margin: 0, fontSize: '1.5rem', color: isDark ? '#f0e6d2' : '#2c1810', fontFamily: "'Cinzel', serif" }}>
+                O Guardião (Notificações)
+              </h2>
+            </div>
+
+            <p style={{ color: isDark ? '#b8a88a' : '#666', marginBottom: '2rem', fontSize: '1rem', fontStyle: 'italic' }}>
+              Configure seu assistente pessoal no WhatsApp para manter a Forja sempre acesa.
+            </p>
+
+            {/* SEÇÃO 1: CONEXÃO */}
+            <div style={{ background: isDark ? 'rgba(0,0,0,0.2)' : 'rgba(255,255,255,0.8)', padding: '1.5rem', borderRadius: '12px', border: `1px solid ${isDark ? 'rgba(212,175,55,0.2)' : '#ccc'}`, marginBottom: '1.5rem' }}>
+              <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', margin: '0 0 1rem 0', color: isDark ? '#d4af37' : '#2c3e50', fontSize: '1.1rem' }}>
+                <Smartphone size={20} /> Conexão WhatsApp
+              </h3>
+              <label style={{ display: 'block', marginBottom: '0.5rem', color: isDark ? '#f0e6d2' : '#2c1810', fontSize: '0.9rem' }}>Seu número (com DDD):</label>
+              <input 
+                type="text" 
+                placeholder="Ex: 62999999999"
+                value={notifSettings.whatsappNumber}
+                onChange={(e) => setNotifSettings({...notifSettings, whatsappNumber: e.target.value.replace(/\D/g, '')})}
+                style={{ width: '100%', maxWidth: '300px', padding: '0.8rem', borderRadius: '8px', border: `1px solid ${isDark ? '#555' : '#ccc'}`, background: isDark ? 'rgba(0,0,0,0.4)' : '#fff', color: isDark ? '#fff' : '#000' }}
+              />
+            </div>
+
+            {/* SEÇÃO 2: HORÁRIOS FIXOS */}
+            <div style={{ background: isDark ? 'rgba(0,0,0,0.2)' : 'rgba(255,255,255,0.8)', padding: '1.5rem', borderRadius: '12px', border: `1px solid ${isDark ? 'rgba(212,175,55,0.2)' : '#ccc'}`, marginBottom: '1.5rem' }}>
+              <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', margin: '0 0 1rem 0', color: isDark ? '#d4af37' : '#2c3e50', fontSize: '1.1rem' }}>
+                <Clock size={20} /> Rotina Diária
+              </h3>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1.5rem' }}>
+                <label style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', color: isDark ? '#f0e6d2' : '#2c1810', fontSize: '0.9rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <input type="checkbox" checked={notifSettings.alerts.dailyVirtue} onChange={(e) => setNotifSettings({...notifSettings, alerts: {...notifSettings.alerts, dailyVirtue: e.target.checked}})} style={{ accentColor: '#d4af37', width: '16px', height: '16px' }} />
+                    Sorteio da Virtude (Manhã)
+                  </div>
+                  <input type="time" value={notifSettings.notifMorningTime} onChange={(e) => setNotifSettings({...notifSettings, notifMorningTime: e.target.value})} style={{ padding: '0.6rem', borderRadius: '6px', border: `1px solid ${isDark ? '#555' : '#ccc'}`, background: isDark ? 'rgba(0,0,0,0.4)' : '#fff', color: isDark ? '#fff' : '#000', width: 'fit-content' }} disabled={!notifSettings.alerts.dailyVirtue} />
+                </label>
+
+                <label style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', color: isDark ? '#f0e6d2' : '#2c1810', fontSize: '0.9rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <input type="checkbox" checked={notifSettings.alerts.dailyEpilogue} onChange={(e) => setNotifSettings({...notifSettings, alerts: {...notifSettings.alerts, dailyEpilogue: e.target.checked}})} style={{ accentColor: '#d4af37', width: '16px', height: '16px' }} />
+                    Lembrete do Epílogo (Noite)
+                  </div>
+                  <input type="time" value={notifSettings.notifNightTime} onChange={(e) => setNotifSettings({...notifSettings, notifNightTime: e.target.value})} style={{ padding: '0.6rem', borderRadius: '6px', border: `1px solid ${isDark ? '#555' : '#ccc'}`, background: isDark ? 'rgba(0,0,0,0.4)' : '#fff', color: isDark ? '#fff' : '#000', width: 'fit-content' }} disabled={!notifSettings.alerts.dailyEpilogue} />
+                </label>
+              </div>
+            </div>
+
+            {/* SEÇÃO 3: ALERTAS CONDICIONAIS */}
+            <div style={{ background: isDark ? 'rgba(0,0,0,0.2)' : 'rgba(255,255,255,0.8)', padding: '1.5rem', borderRadius: '12px', border: `1px solid ${isDark ? 'rgba(212,175,55,0.2)' : '#ccc'}`, marginBottom: '2rem' }}>
+              <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', margin: '0 0 1rem 0', color: isDark ? '#d4af37' : '#2c3e50', fontSize: '1.1rem' }}>
+                <ShieldAlert size={20} /> Guardião de Disciplina
+              </h3>
+              <p style={{ fontSize: '0.85rem', color: isDark ? '#b8a88a' : '#666', marginBottom: '1rem' }}>O Guardião avisa quando você está deixando a inércia vencer (disparado às 19h).</p>
+              
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                {[
+                  { id: 'pendingTasks', label: 'Avisar se houver Tarefas Agendadas pendentes hoje' },
+                  { id: 'readingSlump', label: 'Avisar se eu ficar +3 dias sem avançar nas Leituras' },
+                  { id: 'practiceSlump', label: 'Avisar se eu ficar +3 dias sem registrar Práticas' },
+                  { id: 'diarySlump', label: 'Avisar se eu ficar +3 dias sem preencher o Diário' },
+                  { id: 'gdveWarning', label: 'Avisar faltando 1 semana para a reunião do GDVE (se leitura pendente)' },
+                  { id: 'randomVirtue', label: 'Sorteio Aleatório Diário (Lembrar da Virtude no meio do dia)' }
+                ].map(alert => (
+                  <label key={alert.id} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', color: isDark ? '#f0e6d2' : '#2c1810', fontSize: '0.95rem', cursor: 'pointer' }}>
+                    <input 
+                      type="checkbox" 
+                      checked={notifSettings.alerts[alert.id]} 
+                      onChange={(e) => setNotifSettings({...notifSettings, alerts: {...notifSettings.alerts, [alert.id]: e.target.checked}})} 
+                      style={{ accentColor: '#d4af37', width: '18px', height: '18px', cursor: 'pointer' }} 
+                    />
+                    {alert.label}
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            {/* BOTÃO SALVAR */}
+            <button 
+              onClick={saveNotificationSettings}
+              style={{ width: '100%', padding: '1rem', background: '#27ae60', color: 'white', border: 'none', borderRadius: '8px', fontSize: '1.1rem', fontWeight: 'bold', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', boxShadow: '0 4px 15px rgba(39, 174, 96, 0.3)' }}
+            >
+              <Save size={20} /> Salvar Configurações do Guardião
+            </button>
           </div>
         )}
 
