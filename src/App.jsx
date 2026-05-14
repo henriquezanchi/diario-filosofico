@@ -6,7 +6,8 @@ import {
   Target, TrendingUp, Award, FileText, Book, Settings,
   Trash2, Edit, Save, XCircle, Flame, Zap, Shield, Star, Crown, 
   Bell, Check, Music, MessageSquare, Menu, Lock, ChevronDown, ChevronUp, 
-  Mountain, Landmark, Swords, Bookmark, Library, MessageCircle, Camera
+  Mountain, Landmark, Swords, Bookmark, Library, MessageCircle, Camera,
+  ChevronLeft, Smartphone, Clock, ShieldAlert, ArrowLeft
 } from 'lucide-react';
 
 import { auth, db, messaging } from './config/firebase-config'; 
@@ -59,6 +60,39 @@ function App() {
   const [kuravaEnabled, setKuravaEnabled] = useState(true);
   const [isCloudDataLoaded, setIsCloudDataLoaded] = useState(false);
   const [aiConsent, setAiConsent] = useState(false);
+  // --- ESTADOS DE SEGURANÇA FV (ANTE-SALA) ---
+  const [fvAccessStatus, setFvAccessStatus] = useState('checking'); // 'checking', 'approved', 'pending', 'unregistered'
+  const [requestName, setRequestName] = useState('');
+  const [requestUnit, setRequestUnit] = useState('');
+
+  //--- Estado da Central de Notificação
+  const [notifSettings, setNotifSettings] = useState({
+    whatsappNumber: '',
+    notifMorningTime: '07:30',
+    notifNightTime: '21:00',
+    alerts: {
+      dailyVirtue: true,
+      dailyEpilogue: true,
+      pendingTasks: true,
+      readingSlump: true,
+      practiceSlump: true,
+      diarySlump: true,
+      gdveWarning: true,
+      randomVirtue: false
+    }
+  });
+
+  const saveNotificationSettings = async () => {
+    if (!user) return;
+    try {
+      // Salva em um documento específico de configurações do usuário
+      await setDoc(doc(db, 'userSettings', user.uid), { notifications: notifSettings }, { merge: true });
+      alert("✅ Configurações do Guardião salvas com sucesso!");
+    } catch (e) {
+      console.error("Erro ao salvar notificações:", e);
+      alert("Erro ao salvar as configurações.");
+    }
+  };
 
   const toggleNotifications = async () => {
     if (notificationsActive) {
@@ -1188,8 +1222,6 @@ function App() {
         const data = userDoc.data();
         setTheme(data.theme || 'light');
         setLastDrawDate(data.lastDrawDate || null);
-        setFvUnlocked(false); 
-
         setMorningTime(data.morningTime || '06:00'); 
         setEveningTime(data.eveningTime || '22:00');
         
@@ -1198,12 +1230,45 @@ function App() {
         } else {
           setNotificationsActive(false);
         }
+
+        // LÓGICA DA ANTE-SALA FV
+        if (data.fvStatus === 'approved') {
+          setFvAccessStatus('approved');
+          setFvUnlocked(true); // Destranca as portas do Templo automaticamente!
+          loadMod2Config();    // Inicia o motor GDVE
+        } else if (data.fvStatus === 'pending') {
+          setFvAccessStatus('pending');
+          setFvUnlocked(false);
+        } else {
+          setFvAccessStatus('unregistered');
+          setFvUnlocked(false);
+        }
+
       } else {
+        // Usuário novo criando conta pela primeira vez
         await setDoc(doc(db, 'users', uid), {
-          createdAt: Timestamp.now(), theme: 'light', lastDrawDate: null, fvUnlocked: false
+          createdAt: Timestamp.now(), theme: 'light', lastDrawDate: null, fvUnlocked: false,
+          fvStatus: 'unregistered', email: user?.email || 'Sem e-mail'
         });
+        setFvAccessStatus('unregistered');
+        setFvUnlocked(false);
       }
     } catch (error) { console.error('Erro ao carregar dados:', error); }
+  };
+
+  const handleRequestAccess = async () => {
+    if (!requestName.trim() || !requestUnit.trim()) return alert("Por favor, preencha seu nome e a unidade.");
+    try {
+      await setDoc(doc(db, 'users', user.uid), {
+        fvStatus: 'pending',
+        requestName: requestName.trim(),
+        requestUnit: requestUnit.trim(),
+        requestDate: Timestamp.now()
+      }, { merge: true });
+      setFvAccessStatus('pending');
+    } catch (e) {
+      alert("Erro ao enviar a solicitação. Tente novamente.");
+    }
   };
 
   const loadTodayEntry = async (uid, dateToLoad = null) => {
@@ -3047,6 +3112,64 @@ function App() {
     );
   }
 
+  // --- A ANTE-SALA DE ESPERA (GUARDIÃO DA PORTA) ---
+  if (user && fvAccessStatus !== 'approved') {
+    return (
+      <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', background: isDark ? 'linear-gradient(135deg, #1a1a2e 0%, #16213e 100%)' : 'linear-gradient(135deg, #f0e6d2 0%, #e8dcc4 100%)', fontFamily: 'Georgia, serif', color: isDark ? '#f0e6d2' : '#2c1810' }}>
+        <header style={{ padding: '1.5rem 2rem', background: isDark ? 'rgba(26, 26, 46, 0.9)' : 'rgba(255, 255, 255, 0.5)', borderBottom: `1px solid ${isDark ? 'rgba(212, 175, 55, 0.2)' : 'rgba(139, 115, 85, 0.2)'}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            <Shield size={32} color={isDark ? '#d4af37' : '#8b7355'} />
+            <h1 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 'bold', fontFamily: "'Cinzel', serif" }}>Acesso Restrito</h1>
+          </div>
+          <button onClick={handleLogout} style={{ padding: '0.5rem 1rem', background: 'transparent', border: `1px solid ${isDark ? '#d4af37' : '#8b7355'}`, color: isDark ? '#d4af37' : '#8b7355', borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <LogOut size={16} /> Sair
+          </button>
+        </header>
+
+        <main style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '2rem 1rem' }}>
+          <div className="animate-fadeIn" style={{ background: isDark ? 'rgba(0,0,0,0.4)' : 'white', padding: '2.5rem 2rem', borderRadius: '16px', maxWidth: '450px', width: '100%', border: `2px solid ${isDark ? '#d4af37' : '#8b7355'}`, textAlign: 'center', boxShadow: '0 10px 40px rgba(0,0,0,0.1)' }}>
+            
+            {fvAccessStatus === 'pending' ? (
+              <>
+                <Clock size={56} color={isDark ? '#FFD700' : '#996515'} style={{ margin: '0 auto 1.5rem' }} />
+                <h2 style={{ margin: '0 0 1rem 0', fontFamily: "'Cinzel', serif", fontSize: '1.6rem' }}>Em Análise</h2>
+                <p style={{ lineHeight: '1.6', color: isDark ? '#b8a88a' : '#6b5744', marginBottom: '2rem' }}>
+                  Sua solicitação foi enviada. O instrutor responsável verificará seus dados e liberará o acesso à plataforma em breve.
+                </p>
+                <div style={{ padding: '1rem', background: isDark ? 'rgba(212, 175, 55, 0.1)' : 'rgba(139, 115, 85, 0.1)', borderRadius: '8px', fontStyle: 'italic', fontSize: '0.9rem' }}>
+                  Verifique novamente mais tarde.
+                </div>
+              </>
+            ) : (
+              <>
+                <Lock size={56} color={isDark ? '#d4af37' : '#8b7355'} style={{ margin: '0 auto 1.5rem' }} />
+                <h2 style={{ margin: '0 0 1rem 0', fontFamily: "'Cinzel', serif", fontSize: '1.6rem' }}>Identifique-se</h2>
+                <p style={{ lineHeight: '1.6', color: isDark ? '#b8a88a' : '#6b5744', marginBottom: '2rem' }}>
+                  Esta é uma ferramenta de uso interno. Para solicitar a liberação do seu perfil, preencha os dados abaixo.
+                </p>
+
+                <div style={{ textAlign: 'left', marginBottom: '1.5rem' }}>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', fontSize: '0.9rem' }}>Nome Completo</label>
+                  <input type="text" value={requestName} onChange={(e) => setRequestName(e.target.value)} placeholder="Seu nome..." style={{ width: '100%', padding: '0.85rem', borderRadius: '8px', border: `1px solid ${isDark ? '#555' : '#ccc'}`, background: isDark ? 'rgba(26,26,46,0.8)' : 'white', color: isDark ? '#f0e6d2' : '#2c1810', fontFamily: 'Georgia, serif' }} />
+                </div>
+
+                <div style={{ textAlign: 'left', marginBottom: '2rem' }}>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', fontSize: '0.9rem' }}>Unidade (Sede/Filial)</label>
+                  <input type="text" value={requestUnit} onChange={(e) => setRequestUnit(e.target.value)} placeholder="Ex: Barra do Garças..." style={{ width: '100%', padding: '0.85rem', borderRadius: '8px', border: `1px solid ${isDark ? '#555' : '#ccc'}`, background: isDark ? 'rgba(26,26,46,0.8)' : 'white', color: isDark ? '#f0e6d2' : '#2c1810', fontFamily: 'Georgia, serif' }} />
+                </div>
+
+                <button onClick={handleRequestAccess} style={{ width: '100%', padding: '1rem', background: isDark ? '#d4af37' : '#6b4423', color: isDark ? '#1a1a2e' : 'white', border: 'none', borderRadius: '8px', fontSize: '1.1rem', fontWeight: 'bold', cursor: 'pointer', fontFamily: 'Georgia, serif' }}>
+                  Solicitar Acesso
+                </button>
+              </>
+            )}
+
+          </div>
+        </main>
+      </div>
+    );
+  } 
+
   return (
     <div style={{ minHeight: '100vh', background: isDark ? 'linear-gradient(135deg, #1a1a2e 0%, #16213e 100%)' : 'linear-gradient(135deg, #f0e6d2 0%, #e8dcc4 100%)', fontFamily: 'Georgia, serif', transition: 'background 0.3s ease' }}>
       <header style={{ padding: '1rem 2rem', borderBottom: `2px solid ${isDark ? '#d4af37' : '#6b4423'}`, background: isDark ? 'rgba(26, 26, 46, 0.95)' : 'rgba(240, 230, 210, 0.95)', backdropFilter: 'blur(10px)', position: 'sticky', top: 0, zIndex: 100 }}>
@@ -3137,6 +3260,9 @@ function App() {
                       <button onClick={() => { setView('goals'); setShowPracticesMenu(false); }} style={{ padding: '0.75rem 1rem', background: view === 'goals' ? (isDark ? 'rgba(212,175,55,0.15)' : 'rgba(139,115,85,0.1)') : 'transparent', border: 'none', color: isDark ? '#f0e6d2' : '#2c1810', textAlign: 'left', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.9rem', fontFamily: 'Georgia, serif' }} onMouseOver={(e) => e.currentTarget.style.background = isDark ? 'rgba(212, 175, 55, 0.1)' : 'rgba(139, 115, 85, 0.05)'} onMouseOut={(e) => e.currentTarget.style.background = view === 'goals' ? (isDark ? 'rgba(212,175,55,0.15)' : 'rgba(139,115,85,0.1)') : 'transparent'}>🎯 Metas</button>
                       <button onClick={() => { setView('leituras'); setShowPracticesMenu(false); }} style={{ padding: '0.75rem 1rem', background: view === 'leituras' ? (isDark ? 'rgba(212,175,55,0.15)' : 'rgba(139,115,85,0.1)') : 'transparent', border: 'none', color: isDark ? '#f0e6d2' : '#2c1810', textAlign: 'left', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.9rem', fontFamily: 'Georgia, serif' }} onMouseOver={(e) => e.currentTarget.style.background = isDark ? 'rgba(212, 175, 55, 0.1)' : 'rgba(139, 115, 85, 0.05)'} onMouseOut={(e) => e.currentTarget.style.background = view === 'leituras' ? (isDark ? 'rgba(212,175,55,0.15)' : 'rgba(139,115,85,0.1)') : 'transparent'}><Library size={16}/> Leituras</button>
                       <button onClick={() => { setView('biblioteca'); setShowPracticesMenu(false); }} style={{ padding: '0.75rem 1rem', background: view === 'biblioteca' ? (isDark ? 'rgba(212,175,55,0.15)' : 'rgba(139,115,85,0.1)') : 'transparent', border: 'none', color: isDark ? '#f0e6d2' : '#2c1810', textAlign: 'left', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.9rem', fontFamily: 'Georgia, serif' }} onMouseOver={(e) => e.currentTarget.style.background = isDark ? 'rgba(212, 175, 55, 0.1)' : 'rgba(139, 115, 85, 0.05)'} onMouseOut={(e) => e.currentTarget.style.background = view === 'biblioteca' ? (isDark ? 'rgba(212,175,55,0.15)' : 'rgba(139,115,85,0.1)') : 'transparent'}>🏛️ Virtudes</button>
+                      <button onClick={() => setView('notifications')} style={{ background: 'transparent', border: 'none', color: view === 'notifications' ? (isDark ? '#d4af37' : '#8b7355') : (isDark ? '#f0e6d2' : '#2c1810'), cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: view === 'notifications' ? 'bold' : 'normal' }}>
+                      <Bell size={20} /> Guardião
+                      </button>
                     </div>
                   </div>
                 )}
@@ -3269,21 +3395,50 @@ function App() {
                 </span>
               </div>
               
-              <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-                <input 
-                  type="date" 
-                  value={selectedDate} 
-                  onChange={(e) => handleDateChange(e.target.value)}
-                  max={getTodayKey()} 
-                  style={{ padding: '0.6rem', borderRadius: '8px', border: `1px solid ${isDark ? '#d4af37' : '#ccc'}`, background: isDark ? 'rgba(26, 26, 46, 0.8)' : 'white', color: isDark ? '#f0e6d2' : '#2c1810', fontSize: '1rem', fontFamily: 'Georgia, serif', cursor: 'pointer' }} 
-                />
-                
-                {selectedDate !== getTodayKey() && (
-                  <button onClick={() => handleDateChange(getTodayKey())} style={{ padding: '0.6rem 1rem', background: isDark ? '#d4af37' : '#6b4423', color: isDark ? '#1a1a2e' : 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', transition: 'all 0.2s', boxShadow: '0 2px 8px rgba(0,0,0,0.2)' }}>
-                    Voltar para Hoje
-                  </button>
-                )}
-              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', alignItems: 'center', background: isDark ? 'rgba(0,0,0,0.3)' : 'white', border: `1px solid ${isDark ? '#444' : '#ccc'}`, borderRadius: '8px', padding: '0.2rem' }}>
+            <button 
+              onClick={() => {
+                const d = new Date(currentDate + 'T12:00:00');
+                d.setDate(d.getDate() - 1);
+                setCurrentDate(d.toISOString().split('T')[0]);
+              }}
+              style={{ background: 'transparent', border: 'none', color: isDark ? '#d4af37' : '#2c1810', cursor: 'pointer', padding: '0.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+              title="Dia Anterior"
+            >
+              <ChevronLeft size={20} />
+            </button>
+
+            <input 
+              type="date" 
+              value={currentDate} 
+              onChange={(e) => setCurrentDate(e.target.value)} 
+              max={new Date().toLocaleDateString('en-CA')} // Impede selecionar dias no futuro
+              style={{ background: 'transparent', color: isDark ? '#f0e6d2' : '#2c1810', border: 'none', padding: '0.5rem', fontSize: '1rem', fontFamily: 'Georgia, serif', outline: 'none', cursor: 'pointer' }}
+            />
+
+            <button 
+              onClick={() => {
+                const todayStr = new Date().toLocaleDateString('en-CA');
+                if (currentDate >= todayStr) return; // Não avança se já for hoje
+                const d = new Date(currentDate + 'T12:00:00');
+                d.setDate(d.getDate() + 1);
+                setCurrentDate(d.toISOString().split('T')[0]);
+              }}
+              style={{ background: 'transparent', border: 'none', color: currentDate >= new Date().toLocaleDateString('en-CA') ? (isDark ? '#555' : '#ccc') : (isDark ? '#d4af37' : '#2c1810'), cursor: currentDate >= new Date().toLocaleDateString('en-CA') ? 'not-allowed' : 'pointer', padding: '0.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+              title="Próximo Dia"
+            >
+              <ChevronRight size={20} />
+            </button>
+          </div>
+
+          <button onClick={() => setView('home')} style={{ padding: '0.6rem 1.5rem', background: isDark ? '#d4af37' : '#8b7355', color: isDark ? '#1a1a2e' : 'white', border: 'none', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer', transition: 'transform 0.2s' }}>
+            Voltar ao Início
+          </button>
+          <button onClick={() => setView('notifications')} style={{ background: 'transparent', border: 'none', color: view === 'notifications' ? '#d4af37' : (isDark ? '#f0e6d2' : '#2c1810'), cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <Bell size={20} /> Guardião
+          </button>
+        </div>
             </div>
             {dailyQuote && (
               <div style={{ padding: '2rem', background: isDark ? 'rgba(212, 175, 55, 0.1)' : 'rgba(255, 245, 220, 0.6)', borderRadius: '16px', border: `2px solid ${isDark ? 'rgba(212, 175, 55, 0.3)' : 'rgba(139, 115, 85, 0.3)'}`, marginBottom: '2rem' }}>
@@ -4472,7 +4627,102 @@ function App() {
           </div>
         )}
 
-        {/* MODAL DE CONVITE PÓS-LEITURA (REQ 6) */}
+        {/* VIEW: CENTRAL DE NOTIFICAÇÕES (O GUARDIÃO) */}
+        {view === 'notifications' && (
+          <div className="animate-fadeIn" style={{ maxWidth: '800px', margin: '0 auto', paddingBottom: '2rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '2rem' }}>
+              <button onClick={() => setView('home')} style={{ background: 'transparent', border: 'none', color: isDark ? '#d4af37' : '#8b7355', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
+                <ArrowLeft size={24} />
+              </button>
+              <Bell size={28} color={isDark ? '#d4af37' : '#8b7355'} />
+              <h2 style={{ margin: 0, fontSize: '1.5rem', color: isDark ? '#f0e6d2' : '#2c1810', fontFamily: "'Cinzel', serif" }}>
+                O Guardião (Notificações)
+              </h2>
+            </div>
+
+            <p style={{ color: isDark ? '#b8a88a' : '#666', marginBottom: '2rem', fontSize: '1rem', fontStyle: 'italic' }}>
+              Configure seu assistente pessoal no WhatsApp para manter a Forja sempre acesa.
+            </p>
+
+            {/* SEÇÃO 1: CONEXÃO */}
+            <div style={{ background: isDark ? 'rgba(0,0,0,0.2)' : 'rgba(255,255,255,0.8)', padding: '1.5rem', borderRadius: '12px', border: `1px solid ${isDark ? 'rgba(212,175,55,0.2)' : '#ccc'}`, marginBottom: '1.5rem' }}>
+              <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', margin: '0 0 1rem 0', color: isDark ? '#d4af37' : '#2c3e50', fontSize: '1.1rem' }}>
+                <Smartphone size={20} /> Conexão WhatsApp
+              </h3>
+              <label style={{ display: 'block', marginBottom: '0.5rem', color: isDark ? '#f0e6d2' : '#2c1810', fontSize: '0.9rem' }}>Seu número (com DDD):</label>
+              <input 
+                type="text" 
+                placeholder="Ex: 62999999999"
+                value={notifSettings.whatsappNumber}
+                onChange={(e) => setNotifSettings({...notifSettings, whatsappNumber: e.target.value.replace(/\D/g, '')})}
+                style={{ width: '100%', maxWidth: '300px', padding: '0.8rem', borderRadius: '8px', border: `1px solid ${isDark ? '#555' : '#ccc'}`, background: isDark ? 'rgba(0,0,0,0.4)' : '#fff', color: isDark ? '#fff' : '#000' }}
+              />
+            </div>
+
+            {/* SEÇÃO 2: HORÁRIOS FIXOS */}
+            <div style={{ background: isDark ? 'rgba(0,0,0,0.2)' : 'rgba(255,255,255,0.8)', padding: '1.5rem', borderRadius: '12px', border: `1px solid ${isDark ? 'rgba(212,175,55,0.2)' : '#ccc'}`, marginBottom: '1.5rem' }}>
+              <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', margin: '0 0 1rem 0', color: isDark ? '#d4af37' : '#2c3e50', fontSize: '1.1rem' }}>
+                <Clock size={20} /> Rotina Diária
+              </h3>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1.5rem' }}>
+                <label style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', color: isDark ? '#f0e6d2' : '#2c1810', fontSize: '0.9rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <input type="checkbox" checked={notifSettings.alerts.dailyVirtue} onChange={(e) => setNotifSettings({...notifSettings, alerts: {...notifSettings.alerts, dailyVirtue: e.target.checked}})} style={{ accentColor: '#d4af37', width: '16px', height: '16px' }} />
+                    Sorteio da Virtude (Manhã)
+                  </div>
+                  <input type="time" value={notifSettings.notifMorningTime} onChange={(e) => setNotifSettings({...notifSettings, notifMorningTime: e.target.value})} style={{ padding: '0.6rem', borderRadius: '6px', border: `1px solid ${isDark ? '#555' : '#ccc'}`, background: isDark ? 'rgba(0,0,0,0.4)' : '#fff', color: isDark ? '#fff' : '#000', width: 'fit-content' }} disabled={!notifSettings.alerts.dailyVirtue} />
+                </label>
+
+                <label style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', color: isDark ? '#f0e6d2' : '#2c1810', fontSize: '0.9rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <input type="checkbox" checked={notifSettings.alerts.dailyEpilogue} onChange={(e) => setNotifSettings({...notifSettings, alerts: {...notifSettings.alerts, dailyEpilogue: e.target.checked}})} style={{ accentColor: '#d4af37', width: '16px', height: '16px' }} />
+                    Lembrete do Epílogo (Noite)
+                  </div>
+                  <input type="time" value={notifSettings.notifNightTime} onChange={(e) => setNotifSettings({...notifSettings, notifNightTime: e.target.value})} style={{ padding: '0.6rem', borderRadius: '6px', border: `1px solid ${isDark ? '#555' : '#ccc'}`, background: isDark ? 'rgba(0,0,0,0.4)' : '#fff', color: isDark ? '#fff' : '#000', width: 'fit-content' }} disabled={!notifSettings.alerts.dailyEpilogue} />
+                </label>
+              </div>
+            </div>
+
+            {/* SEÇÃO 3: ALERTAS CONDICIONAIS */}
+            <div style={{ background: isDark ? 'rgba(0,0,0,0.2)' : 'rgba(255,255,255,0.8)', padding: '1.5rem', borderRadius: '12px', border: `1px solid ${isDark ? 'rgba(212,175,55,0.2)' : '#ccc'}`, marginBottom: '2rem' }}>
+              <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', margin: '0 0 1rem 0', color: isDark ? '#d4af37' : '#2c3e50', fontSize: '1.1rem' }}>
+                <ShieldAlert size={20} /> Guardião de Disciplina
+              </h3>
+              <p style={{ fontSize: '0.85rem', color: isDark ? '#b8a88a' : '#666', marginBottom: '1rem' }}>O Guardião avisa quando você está deixando a inércia vencer (disparado às 19h).</p>
+              
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                {[
+                  { id: 'pendingTasks', label: 'Avisar se houver Tarefas Agendadas pendentes hoje' },
+                  { id: 'readingSlump', label: 'Avisar se eu ficar +3 dias sem avançar nas Leituras' },
+                  { id: 'practiceSlump', label: 'Avisar se eu ficar +3 dias sem registrar Práticas' },
+                  { id: 'diarySlump', label: 'Avisar se eu ficar +3 dias sem preencher o Diário' },
+                  { id: 'gdveWarning', label: 'Avisar faltando 1 semana para a reunião do GDVE (se leitura pendente)' },
+                  { id: 'randomVirtue', label: 'Sorteio Aleatório Diário (Lembrar da Virtude no meio do dia)' }
+                ].map(alert => (
+                  <label key={alert.id} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', color: isDark ? '#f0e6d2' : '#2c1810', fontSize: '0.95rem', cursor: 'pointer' }}>
+                    <input 
+                      type="checkbox" 
+                      checked={notifSettings.alerts[alert.id]} 
+                      onChange={(e) => setNotifSettings({...notifSettings, alerts: {...notifSettings.alerts, [alert.id]: e.target.checked}})} 
+                      style={{ accentColor: '#d4af37', width: '18px', height: '18px', cursor: 'pointer' }} 
+                    />
+                    {alert.label}
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            {/* BOTÃO SALVAR */}
+            <button 
+              onClick={saveNotificationSettings}
+              style={{ width: '100%', padding: '1rem', background: '#27ae60', color: 'white', border: 'none', borderRadius: '8px', fontSize: '1.1rem', fontWeight: 'bold', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', boxShadow: '0 4px 15px rgba(39, 174, 96, 0.3)' }}
+            >
+              <Save size={20} /> Salvar Configurações do Guardião
+            </button>
+          </div>
+        )}
+
+              {/* MODAL DE CONVITE PÓS-LEITURA (REQ 6) */}
               {postReadInvite && (
                 <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.85)', zIndex: 10001, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem', backdropFilter: 'blur(5px)' }}>
                   <div className="animate-fadeIn" style={{ background: isDark ? '#1a1a2e' : '#fdfbf7', padding: '2rem', borderRadius: '16px', maxWidth: '450px', width: '100%', border: `2px solid ${isDark ? '#FFD700' : '#996515'}`, textAlign: 'center', boxShadow: '0 10px 40px rgba(0,0,0,0.5)' }}>
@@ -6068,7 +6318,7 @@ function App() {
         {/* MODAL DE CONFIGURAÇÕES (HORÁRIOS) */}
         {showSettingsModal && (
           <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.8)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem', backdropFilter: 'blur(5px)' }}>
-            <div className="animate-fadeIn" style={{ background: isDark ? '#1a1a2e' : '#fdfbf7', padding: '2rem', borderRadius: '16px', maxWidth: '400px', width: '100%', border: `2px solid ${isDark ? '#d4af37' : '#6b4423'}`, textAlign: 'center', boxShadow: '0 10px 40px rgba(0,0,0,0.3)', position: 'relative' }}>
+            <div className="animate-fadeIn" style={{ background: isDark ? '#1a1a2e' : '#fdfbf7', padding: '2rem', borderRadius: '16px', maxWidth: '400px', width: '100%', border: `2px solid ${isDark ? '#d4af37' : '#6b4423'}`, textAlign: 'center', boxShadow: '0 10px 40px rgba(0,0,0,0.3)', position: 'relative', maxHeight: '85vh', overflowY: 'auto' }}>
               
               {/* Botão de Fechar */}
               <button onClick={() => setShowSettingsModal(false)} style={{ position: 'absolute', top: '1rem', right: '1rem', background: 'transparent', border: 'none', color: isDark ? '#f0e6d2' : '#2c1810', cursor: 'pointer' }}>
